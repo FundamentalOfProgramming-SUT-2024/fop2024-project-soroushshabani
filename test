@@ -1,0 +1,381 @@
+#include <ncurses.h>
+#include <stdlib.h>
+#include <time.h>
+
+// تنظیمات اتاق‌ها
+#define MAX_ROOMS 6
+#define MIN_ROOM_WIDTH 6
+#define MAX_ROOM_WIDTH 15
+#define MIN_ROOM_HEIGHT 6
+#define MAX_ROOM_HEIGHT 8
+#define ROOM_PADDING 2
+#define MAX_PILLARS 3
+#define MAX_ROWS 100
+#define MAX_COLS 100
+
+// نقشه بازی (صفحه نمایش که روی آن همه چیز رسم می‌شود)
+typedef struct {
+    int x, y;
+    int width, height;
+} Room;
+char map[MAX_ROWS][MAX_COLS];
+
+// بررسی تداخل اتاق‌ها
+int check_overlap(Room new_room, Room rooms[], int count) {
+    for (int i = 0; i < count; i++) {
+        if (new_room.x < rooms[i].x + rooms[i].width + ROOM_PADDING &&
+            new_room.x + new_room.width > rooms[i].x - ROOM_PADDING &&
+            new_room.y < rooms[i].y + rooms[i].height + ROOM_PADDING &&
+            new_room.y + new_room.height > rooms[i].y - ROOM_PADDING) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// تولید اتاق‌ها
+void create_rooms(Room rooms[], int count) {
+    for (int i = 0; i < count; i++) {
+        Room new_room;
+        new_room.width = rand() % (MAX_ROOM_WIDTH - MIN_ROOM_WIDTH + 1) + MIN_ROOM_WIDTH;
+        new_room.height = rand() % (MAX_ROOM_HEIGHT - MIN_ROOM_HEIGHT + 1) + MIN_ROOM_HEIGHT;
+        do {
+            new_room.x = rand() % (COLS - new_room.width - 3);
+            new_room.y = rand() % (LINES - new_room.height - 3);
+        } while (check_overlap(new_room, rooms, i));
+        rooms[i] = new_room;
+    }
+}
+
+// بررسی وجود اتاق در سمت مورد نظر
+int room_in_direction(Room room, Room rooms[], int count, char direction) {
+    for (int i = 0; i < count; i++) {
+        switch (direction) {
+            case 'U': // بالا
+                if (room.x < rooms[i].x + rooms[i].width &&
+                    room.x + room.width > rooms[i].x &&
+                    room.y > rooms[i].y + rooms[i].height) {
+                    return 1;
+                }
+                break;
+            case 'D': // پایین
+                if (room.x < rooms[i].x + rooms[i].width &&
+                    room.x + room.width > rooms[i].x &&
+                    room.y + room.height < rooms[i].y) {
+                    return 1;
+                }
+                break;
+            case 'L': // چپ
+                if (room.y < rooms[i].y + rooms[i].height &&
+                    room.y + room.height > rooms[i].y &&
+                    room.x > rooms[i].x + rooms[i].width) {
+                    return 1;
+                }
+                break;
+            case 'R': // راست
+                if (room.y < rooms[i].y + rooms[i].height &&
+                    room.y + room.height > rooms[i].y &&
+                    room.x + room.width < rooms[i].x) {
+                    return 1;
+                }
+                break;
+        }
+    }
+    return 0;
+}
+
+// تابع برای قرار دادن پنجره در دیوار اتاق
+void place_window_in_room(Room *room, Room rooms[], int count) {
+    int window_x = 0, window_y = 0;
+    int side = rand() % 4; // انتخاب یک طرف (بالا، پایین، چپ یا راست)
+
+    // انتخاب دیوار مناسب برای قرار دادن پنجره
+    if (side == 0) { // دیوار بالایی
+        window_x = room->x + 1 + rand() % (room->width - 2);
+        window_y = room->y;
+    } else if (side == 1) { // دیوار پایینی
+        window_x = room->x + 1 + rand() % (room->width - 2);
+        window_y = room->y + room->height - 1;
+    } else if (side == 2) { // دیوار چپ
+        window_x = room->x;
+        window_y = room->y + 1 + rand() % (room->height - 2);
+    } else { // دیوار راست
+        window_x = room->x + room->width - 1;
+        window_y = room->y + 1 + rand() % (room->height - 2);
+    }
+
+    // اطمینان از اینکه پنجره در یک موقعیت معتبر قرار گیرد
+    if (map[window_y][window_x] == '+' || map[window_y][window_x] == '=') {
+        return; // اگر جای پنجره قبلاً اشغال شده باشد، از آن صرف نظر کن
+    }
+
+    // اگر اتاق در جهت پنجره وجود داشته باشد، آن را نمایش بده
+    if (room_in_direction(*room, rooms, count, side)) {
+        map[window_y][window_x] = '='; // نمای پنجره در نقشه
+    }
+}
+
+// رسم اتاق
+void draw_room(Room room, Room rooms[], int count) {
+    for (int i = 0; i < room.height; i++) {
+        for (int j = 0; j < room.width; j++) {
+            int cur_x = room.x + j;
+            int cur_y = room.y + i;
+            if (i == 0 || i == room.height - 1 || j == 0 || j == room.width - 1) {
+                // اگر در موقعیت دیوار بالایی، پایینی، چپ یا راست باشیم
+                if (j == room.width / 2 && i == 0 && room_in_direction(room, rooms, count, 'U')) {
+                    mvaddch(cur_y, cur_x, '='); // پنجره در بالای اتاق
+                } else if (j == room.width / 2 && i == room.height - 1 && room_in_direction(room, rooms, count, 'D')) {
+                    mvaddch(cur_y, cur_x, '='); // پنجره در پایین اتاق
+                } else if (i == room.height / 2 && j == 0 && room_in_direction(room, rooms, count, 'L')) {
+                    mvaddch(cur_y, cur_x, '='); // پنجره در سمت چپ اتاق
+                } else if (i == room.height / 2 && j == room.width - 1 && room_in_direction(room, rooms, count, 'R')) {
+                    mvaddch(cur_y, cur_x, '='); // پنجره در سمت راست اتاق
+                } else {
+                    mvaddch(cur_y, cur_x, (i == 0 || i == room.height - 1) ? '-' : '|');
+                }
+            } else {
+                mvaddch(cur_y, cur_x, '.');
+            }
+        }
+    }
+}
+
+// **اضافه کردن ستون‌های تصادفی داخل اتاق‌ها**
+void add_pillars(Room room) {
+    int num_pillars = rand() % (MAX_PILLARS + 1); // ۰ تا ۳ ستون در هر اتاق
+    for (int i = 0; i < num_pillars; i++) {
+        int pillar_x, pillar_y;
+        do {
+            pillar_x = room.x + 1 + rand() % (room.width - 2);
+            pillar_y = room.y + 1 + rand() % (room.height - 2);
+        } while (mvinch(pillar_y, pillar_x) != '.'); // جلوگیری از قرارگیری روی دیوار
+        mvaddch(pillar_y, pillar_x, 'O'); // نمایش ستون
+    }
+}
+
+// رسم در
+void draw_door(int door_x, int door_y) {
+    mvaddch(door_y, door_x, '+');
+}
+
+// بررسی اینکه یک نقطه داخل اتاق است
+int is_point_inside_room(int x, int y, Room room) {
+    return (x >= room.x && x < room.x + room.width &&
+            y >= room.y && y < room.y + room.height);
+}
+
+// بررسی مسیر راهرو
+int corridor_clear(int sx, int sy, int ex, int ey, int cy, Room rooms[], int count) {
+    int step;
+    for (int i = 0; i < count; i++) {
+        if (is_point_inside_room(sx, cy, rooms[i]) || is_point_inside_room(ex, cy, rooms[i]))
+            return 0;
+    }
+    step = (sy < cy) ? 1 : -1;
+    for (int y = sy; y != cy; y += step)
+        for (int i = 0; i < count; i++)
+            if (is_point_inside_room(sx, y, rooms[i]))
+                return 0;
+
+    step = (sx < ex) ? 1 : -1;
+    for (int x = sx; x != ex; x += step)
+        for (int i = 0; i < count; i++)
+            if (is_point_inside_room(x, cy, rooms[i]))
+                return 0;
+
+    step = (cy < ey) ? 1 : -1;
+    for (int y = cy; y != ey; y += step)
+        for (int i = 0; i < count; i++)
+            if (is_point_inside_room(ex, y, rooms[i]))
+                return 0;
+
+    return 1;
+}
+
+// رسم راهرو
+void draw_corridor(int sx, int sy, int ex, int ey, int cy) {
+    int step;
+    step = (sy < cy) ? 1 : -1;
+    for (int y = sy; y != cy; y += step)
+        mvaddch(y, sx, '#');
+    mvaddch(cy, sx, '#');
+
+    step = (sx < ex) ? 1 : -1;
+    for (int x = sx; x != ex; x += step)
+        mvaddch(cy, x, '#');
+    mvaddch(cy, ex, '#');
+
+    step = (cy < ey) ? 1 : -1;
+    for (int y = cy; y != ey; y += step)
+        mvaddch(y, ex, '#');
+    mvaddch(ey, ex, '#');
+}
+
+// اتصال اتاق‌ها
+int connect_rooms(Room roomA, Room roomB, Room rooms[], int total_rooms) {
+    int doorA_x = roomA.x + roomA.width - 1;
+    int doorA_y = roomA.y + roomA.height / 2;
+    int doorB_x = roomB.x;
+    int doorB_y = roomB.y + roomB.height / 2;
+
+    int corridor_start_x = doorA_x + 1;
+    int corridor_start_y = doorA_y;
+    int corridor_end_x = doorB_x - 1;
+    int corridor_end_y = doorB_y;
+
+    int cy = (corridor_start_y + corridor_end_y) / 2;
+
+    if (corridor_clear(corridor_start_x, corridor_start_y, corridor_end_x, corridor_end_y, cy, rooms, total_rooms)) {
+        draw_door(doorA_x, doorA_y);
+        draw_door(doorB_x, doorB_y);
+        draw_corridor(corridor_start_x, corridor_start_y, corridor_end_x, corridor_end_y, cy);
+        return 1;
+    }
+    return 0;
+}
+
+// اطمینان از اتصال کامل اتاق‌ها
+// اطمینان از اتصال کامل اتاق‌ها
+void ensure_full_connectivity(Room rooms[], int total_rooms) {
+    int visited[MAX_ROOMS] = {0};
+    int stack[MAX_ROOMS];
+    int stack_top = -1;
+
+    // شروع DFS از اولین اتاق
+    stack[++stack_top] = 0;
+    visited[0] = 1;
+
+    while (stack_top >= 0) {
+        int current = stack[stack_top--];
+
+        for (int i = 0; i < total_rooms; i++) {
+            if (!visited[i] && connect_rooms(rooms[current], rooms[i], rooms, total_rooms)) {
+                visited[i] = 1;
+                stack[++stack_top] = i;
+            }
+        }
+    }
+
+    // بررسی اتاق‌های جدا
+    for (int i = 0; i < total_rooms; i++) {
+        if (!visited[i]) {
+            // اتصال اتاق جدا به یک اتاق تصادفی متصل
+            for (int j = 0; j < total_rooms; j++) {
+                if (visited[j]) {
+                    connect_rooms(rooms[i], rooms[j], rooms, total_rooms);
+                    visited[i] = 1;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+
+// متغیر جدید برای حالت حرکت
+int waiting_for_direction = 0;
+int move_direction_x = 0, move_direction_y = 0;
+
+// تابع برای شروع حرکت مداوم در جهت مشخص
+void start_continuous_move(int x_dir, int y_dir) {
+    move_direction_x = x_dir;
+    move_direction_y = y_dir;
+    waiting_for_direction = 0;  // پایان حالت انتظار
+}
+
+// تغییر در تابع move_character
+void move_character(int *x, int *y, char *prev_cell) {
+    int ch = getch();
+    int new_x = *x, new_y = *y;
+
+    // اگر در حالت انتظار برای انتخاب جهت حرکت هستیم
+    if (waiting_for_direction) {
+        switch (ch) {
+            case 'h': start_continuous_move(-1, 0); break; // حرکت به چپ
+            case 'j': start_continuous_move(0, 1); break;  // حرکت به پایین
+            case 'k': start_continuous_move(0, -1); break; // حرکت به بالا
+            case 'l': start_continuous_move(1, 0); break;  // حرکت به راست
+        }
+    } else {
+        // حرکت بر اساس دکمه‌های جهت‌دار
+        switch (ch) {
+            case 'j':    new_y--; break; // پایین
+            case 'k':  new_y++; break;  // بالا
+            case 'h':  new_x--; break;  // چپ
+            case 'l': new_x++; break;  // راست
+            case 'y': new_x--; new_y--; break; // بالا چپ
+            case 'u': new_x++; new_y--; break; // بالا راست
+            case 'b': new_x--; new_y++; break; // پایین چپ
+            case 'n': new_x++; new_y++; break; // پایین راست
+            case 'f':  // شروع حالت انتظار برای حرکت مداوم
+                waiting_for_direction = 1; break;
+        }
+    }
+
+    chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+
+    // اگر در حالت حرکت مداوم هستیم، حرکت ادامه می‌یابد
+    if (waiting_for_direction == 0) {
+        // حرکت مداوم
+        while (next_cell == '.' || next_cell == '#' || next_cell == '+') {
+            mvaddch(*y, *x, *prev_cell);  // پاک کردن موقعیت قبلی
+            *prev_cell = next_cell;
+            *x = new_x;
+            *y = new_y;
+            mvaddch(*y, *x, '@');  // جدیدترین موقعیت
+            refresh();
+            new_x += move_direction_x;
+            new_y += move_direction_y;
+            next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+        }
+        // پس از برخورد با دیوار یا محدودیت، به حالت عادی برگردیم
+        waiting_for_direction = 0;
+    } else {
+        chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+
+        if (next_cell == '.' || next_cell == '#' || next_cell == '+') {
+            mvaddch(*y, *x, *prev_cell);
+            *prev_cell = next_cell;
+            *x = new_x;
+            *y = new_y;
+            mvaddch(*y, *x, '@');
+        }
+    }
+}
+
+// اجرای برنامه
+int main() {
+    srand(time(NULL));
+    initscr();
+    noecho();
+    cbreak();
+    keypad(stdscr, TRUE);
+
+    Room rooms[MAX_ROOMS];
+    create_rooms(rooms, MAX_ROOMS);
+
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        draw_room(rooms[i], rooms, MAX_ROOMS);
+        add_pillars(rooms[i]); // **اضافه کردن ستون‌ها به هر اتاق**
+        place_window_in_room(&rooms[i], rooms, MAX_ROOMS); // افزودن پنجره‌ها
+
+    }
+
+    ensure_full_connectivity(rooms, MAX_ROOMS);
+
+    int player_x = rooms[0].x + 1;
+    int player_y = rooms[0].y + 1;
+    char prev_cell = '.';
+    mvaddch(player_y, player_x, '@');
+
+    while (1) {
+        move_character(&player_x, &player_y, &prev_cell);
+        refresh();
+    }
+
+    refresh();
+    getch();
+    endwin();
+    return 0;
+}
