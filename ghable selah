@@ -1,0 +1,593 @@
+#include <ncurses.h>
+#include <stdlib.h>
+#include <time.h>
+#include <locale.h>
+#include <string.h>
+
+// تنظیمات اتاق‌ها
+#define MAX_ROOMS 6
+#define MIN_ROOM_WIDTH 6
+#define MAX_ROOM_WIDTH 15
+#define MIN_ROOM_HEIGHT 6
+#define MAX_ROOM_HEIGHT 8
+#define ROOM_PADDING 2
+#define MAX_PILLARS 3
+#define MAX_ROWS 100
+#define MAX_COLS 100
+#define MAX_INVENTORY_ITEMS 100
+#define ITEM_NAME_LENGTH 50
+
+// نقشه بازی (صفحه نمایش که روی آن همه چیز رسم می‌شود)
+typedef struct {
+    int x, y;
+    int width, height;
+} Room;
+typedef struct {
+    char name[ITEM_NAME_LENGTH];
+    char type[ITEM_NAME_LENGTH]; // نوع آیتم مانند غذا، اسلحه، طلسم
+} Item;
+
+Item inventory[MAX_INVENTORY_ITEMS];
+int inventory_count = 0;
+int inventory_open = 0; // 0: بسته، 1: باز
+char current_weapon[ITEM_NAME_LENGTH] = "Mace"; // سلاح فعلی بازیکن
+
+int placed_black_gold = 0; // شمارش طلای سیاه قرار داده شده
+
+int placed_gold_bags = 0; // شمارش کیسه‌های طلای قرار داده شده
+char current_message[100] = ""; // متغیری برای ذخیره پیام فعلی
+int regenerations = 0; // شمارنده بازسازی‌ها
+int placed_gold = 0;
+char map[MAX_ROWS][MAX_COLS];
+char trap_map[MAX_ROWS][MAX_COLS]; // نقشه تله‌ها
+char gold_message[50] = "";
+int gold_count = 0;
+
+// بررسی تداخل اتاق‌ها
+int check_overlap(Room new_room, Room rooms[], int count) {
+    for (int i = 0; i < count; i++) {
+        if (new_room.x < rooms[i].x + rooms[i].width + ROOM_PADDING &&
+            new_room.x + new_room.width > rooms[i].x - ROOM_PADDING &&
+            new_room.y < rooms[i].y + rooms[i].height + ROOM_PADDING &&
+            new_room.y + new_room.height > rooms[i].y - ROOM_PADDING) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// تولید اتاق‌ها
+void create_rooms(Room rooms[], int count) {
+    for (int i = 0; i < count; i++) {
+        Room new_room;
+        new_room.width = rand() % (MAX_ROOM_WIDTH - MIN_ROOM_WIDTH + 1) + MIN_ROOM_WIDTH;
+        new_room.height = rand() % (MAX_ROOM_HEIGHT - MIN_ROOM_HEIGHT + 1) + MIN_ROOM_HEIGHT;
+        do {
+            new_room.x = rand() % (COLS - new_room.width - 3);
+            new_room.y = rand() % (LINES - new_room.height - 3);
+        } while (check_overlap(new_room, rooms, i));
+        rooms[i] = new_room;
+    }
+}
+
+// بررسی وجود اتاق در سمت مورد نظر
+int room_in_direction(Room room, Room rooms[], int count, char direction) {
+    for (int i = 0; i < count; i++) {
+        switch (direction) {
+            case 'U': // بالا
+                if (room.x < rooms[i].x + rooms[i].width &&
+                    room.x + room.width > rooms[i].x &&
+                    room.y > rooms[i].y + rooms[i].height) {
+                    return 1;
+                }
+                break;
+            case 'D': // پایین
+                if (room.x < rooms[i].x + rooms[i].width &&
+                    room.x + room.width > rooms[i].x &&
+                    room.y + room.height < rooms[i].y) {
+                    return 1;
+                }
+                break;
+            case 'L': // چپ
+                if (room.y < rooms[i].y + rooms[i].height &&
+                    room.y + room.height > rooms[i].y &&
+                    room.x > rooms[i].x + rooms[i].width) {
+                    return 1;
+                }
+                break;
+            case 'R': // راست
+                if (room.y < rooms[i].y + rooms[i].height &&
+                    room.y + room.height > rooms[i].y &&
+                    room.x + room.width < rooms[i].x) {
+                    return 1;
+                }
+                break;
+        }
+    }
+    return 0;
+}
+
+// تابع برای قرار دادن پنجره در دیوار اتاق
+void place_window_in_room(Room *room, Room rooms[], int count) {
+    int window_x = 0, window_y = 0;
+    int side = rand() % 4; // انتخاب یک طرف (بالا، پایین، چپ یا راست)
+
+    // انتخاب دیوار مناسب برای قرار دادن پنجره
+    if (side == 0) { // دیوار بالایی
+        window_x = room->x + 1 + rand() % (room->width - 2);
+        window_y = room->y;
+    } else if (side == 1) { // دیوار پایینی
+        window_x = room->x + 1 + rand() % (room->width - 2);
+        window_y = room->y + room->height - 1;
+    } else if (side == 2) { // دیوار چپ
+        window_x = room->x;
+        window_y = room->y + 1 + rand() % (room->height - 2);
+    } else { // دیوار راست
+        window_x = room->x + room->width - 1;
+        window_y = room->y + 1 + rand() % (room->height - 2);
+    }
+
+    // اطمینان از اینکه پنجره در یک موقعیت معتبر قرار گیرد
+    if (map[window_y][window_x] == '+' || map[window_y][window_x] == '=') {
+        return; // اگر جای پنجره قبلاً اشغال شده باشد، از آن صرف نظر کن
+    }
+
+    // اگر اتاق در جهت پنجره وجود داشته باشد، آن را نمایش بده
+    if (room_in_direction(*room, rooms, count, side)) {
+        map[window_y][window_x] = '='; // نمای پنجره در نقشه
+    }
+}
+
+// رسم اتاق
+void draw_room(Room room, Room rooms[], int count) {
+    for (int i = 0; i < room.height; i++) {
+        for (int j = 0; j < room.width; j++) {
+            int cur_x = room.x + j;
+            int cur_y = room.y + i;
+            if (i == 0 || i == room.height - 1 || j == 0 || j == room.width - 1) {
+                // اگر در موقعیت دیوار بالایی، پایینی، چپ یا راست باشیم
+                if (j == room.width / 2 && i == 0 && room_in_direction(room, rooms, count, 'U')) {
+                    mvaddch(cur_y, cur_x, '='); // پنجره در بالای اتاق
+                } else if (j == room.width / 2 && i == room.height - 1 && room_in_direction(room, rooms, count, 'D')) {
+                    mvaddch(cur_y, cur_x, '='); // پنجره در پایین اتاق
+                } else if (i == room.height / 2 && j == 0 && room_in_direction(room, rooms, count, 'L')) {
+                    mvaddch(cur_y, cur_x, '='); // پنجره در سمت چپ اتاق
+                } else if (i == room.height / 2 && j == room.width - 1 && room_in_direction(room, rooms, count, 'R')) {
+                    mvaddch(cur_y, cur_x, '='); // پنجره در سمت راست اتاق
+                } else {
+                    mvaddch(cur_y, cur_x, (i == 0 || i == room.height - 1) ? '-' : '|');
+                }
+            } else {
+                mvaddch(cur_y, cur_x, '.');
+            }
+        }
+    }
+}
+
+// **اضافه کردن ستون‌های تصادفی داخل اتاق‌ها**
+void add_pillars(Room room) {
+    int num_pillars = rand() % (MAX_PILLARS + 1); // ۰ تا ۳ ستون در هر اتاق
+    for (int i = 0; i < num_pillars; i++) {
+        int pillar_x, pillar_y;
+        do {
+            pillar_x = room.x + 1 + rand() % (room.width - 2);
+            pillar_y = room.y + 1 + rand() % (room.height - 2);
+        } while (mvinch(pillar_y, pillar_x) != '.'); // جلوگیری از قرارگیری روی دیوار
+        attron(COLOR_PAIR(3)); // استفاده از رنگ قرمز برای تله‌ها
+
+        mvaddch(pillar_y, pillar_x, 'O'); // نمایش ستون
+        attroff(COLOR_PAIR(3)); // استفاده از رنگ قرمز برای تله‌ها
+
+    }
+}
+
+// رسم در
+void draw_door(int door_x, int door_y) {
+    mvaddch(door_y, door_x, '+');
+}
+
+// بررسی اینکه یک نقطه داخل اتاق است
+int is_point_inside_room(int x, int y, Room room) {
+    return (x >= room.x && x < room.x + room.width &&
+            y >= room.y && y < room.y + room.height);
+}
+
+// بررسی مسیر راهرو
+int corridor_clear(int sx, int sy, int ex, int ey, int cy, Room rooms[], int count) {
+    int step;
+    for (int i = 0; i < count; i++) {
+        if (is_point_inside_room(sx, cy, rooms[i]) || is_point_inside_room(ex, cy, rooms[i]))
+            return 0;
+    }
+    step = (sy < cy) ? 1 : -1;
+    for (int y = sy; y != cy; y += step)
+        for (int i = 0; i < count; i++)
+            if (is_point_inside_room(sx, y, rooms[i]))
+                return 0;
+
+    step = (sx < ex) ? 1 : -1;
+    for (int x = sx; x != ex; x += step)
+        for (int i = 0; i < count; i++)
+            if (is_point_inside_room(x, cy, rooms[i]))
+                return 0;
+
+    step = (cy < ey) ? 1 : -1;
+    for (int y = cy; y != ey; y += step)
+        for (int i = 0; i < count; i++)
+            if (is_point_inside_room(ex, y, rooms[i]))
+                return 0;
+
+    return 1;
+}
+void add_traps_to_room(Room *room) {
+    for (int i = 0; i < 3; i++) {
+        int trap_x, trap_y;
+        do {
+            trap_x = room->x + 1 + rand() % (room->width - 2);
+            trap_y = room->y + 1 + rand() % (room->height - 2);
+        } while (trap_map[trap_y][trap_x] == 'T'); // اطمینان از اینکه تله روی تله دیگری قرار نگیرد
+
+        map[trap_y][trap_x] = 'T'; // Mark position of gold bag in map
+        attron(COLOR_PAIR(1)); // استفاده از رنگ قرمز برای تله‌ها
+        mvaddch(trap_y, trap_x, 'T'); // Display gold bag on screen
+        attroff(COLOR_PAIR(1)); // استفاده از رنگ قرمز برای تله‌ها
+
+    }
+}
+
+// مقداردهی اولیه به نقشه تله‌ها
+void initialize_trap_map() {
+    for (int i = 0; i < MAX_ROWS; i++) {
+        for (int j = 0; j < MAX_COLS; j++) {
+            trap_map[i][j] = ' '; // هیچ تله‌ای در ابتدا وجود ندارد
+        }
+    }
+}
+
+// رسم راهرو
+void draw_corridor(int sx, int sy, int ex, int ey, int cy) {
+    int step;
+    step = (sy < cy) ? 1 : -1;
+    for (int y = sy; y != cy; y += step)
+        mvaddch(y, sx, '#');
+    mvaddch(cy, sx, '#');
+
+    step = (sx < ex) ? 1 : -1;
+    for (int x = sx; x != ex; x += step)
+        mvaddch(cy, x, '#');
+    mvaddch(cy, ex, '#');
+
+    step = (cy < ey) ? 1 : -1;
+    for (int y = cy; y != ey; y += step)
+        mvaddch(y, ex, '#');
+    mvaddch(ey, ex, '#');
+}
+
+// اتصال اتاق‌ها
+int connect_rooms(Room roomA, Room roomB, Room rooms[], int total_rooms) {
+    int doorA_x = roomA.x + roomA.width - 1;
+    int doorA_y = roomA.y + roomA.height / 2;
+    int doorB_x = roomB.x;
+    int doorB_y = roomB.y + roomB.height / 2;
+
+    int corridor_start_x = doorA_x + 1;
+    int corridor_start_y = doorA_y;
+    int corridor_end_x = doorB_x - 1;
+    int corridor_end_y = doorB_y;
+
+    int cy = (corridor_start_y + corridor_end_y) / 2;
+
+    if (corridor_clear(corridor_start_x, corridor_start_y, corridor_end_x, corridor_end_y, cy, rooms, total_rooms)) {
+        draw_door(doorA_x, doorA_y);
+        draw_door(doorB_x, doorB_y);
+        draw_corridor(corridor_start_x, corridor_start_y, corridor_end_x, corridor_end_y, cy);
+        return 1;
+    }
+    return 0;
+}
+
+// اطمینان از اتصال کامل اتاق‌ها
+// اطمینان از اتصال کامل اتاق‌ها
+void ensure_full_connectivity(Room rooms[], int total_rooms) {
+    int visited[MAX_ROOMS] = {0};
+    int stack[MAX_ROOMS];
+    int stack_top = -1;
+
+    // شروع DFS از اولین اتاق
+    stack[++stack_top] = 0;
+    visited[0] = 1;
+
+    while (stack_top >= 0) {
+        int current = stack[stack_top--];
+
+        for (int i = 0; i < total_rooms; i++) {
+            if (!visited[i] && connect_rooms(rooms[current], rooms[i], rooms, total_rooms)) {
+                visited[i] = 1;
+                stack[++stack_top] = i;
+            }
+        }
+    }
+
+    // بررسی اتاق‌های جدا
+    for (int i = 0; i < total_rooms; i++) {
+        if (!visited[i]) {
+            // اتصال اتاق جدا به یک اتاق تصادفی متصل
+            for (int j = 0; j < total_rooms; j++) {
+                if (visited[j]) {
+                    connect_rooms(rooms[i], rooms[j], rooms, total_rooms);
+                    visited[i] = 1;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+
+// متغیر جدید برای حالت حرکت
+int waiting_for_direction = 0;
+int move_direction_x = 0, move_direction_y = 0;
+
+// تابع برای شروع حرکت مداوم در جهت مشخص
+void start_continuous_move(int x_dir, int y_dir) {
+    move_direction_x = x_dir;
+    move_direction_y = y_dir;
+    waiting_for_direction = 0;  // پایان حالت انتظار
+}
+
+void add_gold_bag_to_room(Room *room) {
+    for (int i = 0; i < 1; i++) { // Add 1 gold bag per room
+        int gold_bag_x, gold_bag_y;
+        do {
+            gold_bag_x = room->x + 1 + rand() % (room->width - 2);
+            gold_bag_y = room->y + 1 + rand() % (room->height - 2);
+        } while (map[gold_bag_y][gold_bag_x] == '&'); // Ensure we don't place gold bag on another gold bag
+
+        map[gold_bag_y][gold_bag_x] = '&'; // Mark position of gold bag in map
+        attron(COLOR_PAIR(2)); // استفاده از رنگ قرمز برای تله‌ها
+        mvaddch(gold_bag_y, gold_bag_x, '&'); // Display gold bag on screen
+        attroff(COLOR_PAIR(2)); // استفاده از رنگ قرمز برای تله‌ها
+
+    }
+}
+void add_black_gold_to_room(Room *room, int *black_gold_room_count) {
+    // فقط اگر تعداد اتاق‌های دارای طلای سیاه کمتر از 2 باشد، طلای سیاه اضافه کن
+    if (*black_gold_room_count < 2) {
+        int black_gold_x, black_gold_y;
+        do {
+            black_gold_x = room->x + 1 + rand() % (room->width - 2);
+            black_gold_y = room->y + 1 + rand() % (room->height - 2);
+        } while (map[black_gold_y][black_gold_x] == 'B'); // Ensure we don't place black gold on another black gold
+
+        map[black_gold_y][black_gold_x] = 'B'; // Place black gold in the map
+        attron(COLOR_PAIR(4)); // استفاده از رنگ قرمز برای تله‌ها
+        mvaddch(black_gold_y, black_gold_x, 'B'); // Display black gold on screen
+        attroff(COLOR_PAIR(4)); // استفاده از رنگ قرمز برای تله‌ها
+
+        (*black_gold_room_count)++; // افزایش شمارنده اتاق‌های دارای طلای سیاه
+    }
+}
+
+void add_to_inventory(const char* item_name, const char* item_type) {
+    for (int i = 0; i < inventory_count; i++) {
+        if (strcmp(inventory[i].name, item_name) == 0 && strcmp(inventory[i].type, item_type) == 0) {
+            // آیتم قبلاً در اینونتوری وجود دارد، نیازی به افزودن مجدد نیست
+            return;
+        }
+    }
+
+    if (inventory_count < MAX_INVENTORY_ITEMS) {
+        strncpy(inventory[inventory_count].name, item_name, ITEM_NAME_LENGTH - 1);
+        strncpy(inventory[inventory_count].type, item_type, ITEM_NAME_LENGTH - 1);
+        inventory_count++;
+    } else {
+        printw("Inventory is full. Cannot add more items.\n");
+    }
+}
+void add_mace_to_inventory() {
+    add_to_inventory("\u2692", "Weapon");
+}
+void add_sword_to_inventory() {
+    add_to_inventory("\u2694", "Weapon");
+}
+void add_dagger_to_inventory() {
+    add_to_inventory("\U0001F5E1", "Weapon");
+}
+void add_arrow_to_inventory() {
+    add_to_inventory("\u27B3", "Weapon");
+}
+void add_wand_to_inventory() {
+    add_to_inventory("\U0001FA84", "Weapon");
+}
+void show_inventory() {
+    int start_x = COLS - 30; // موقعیت افقی برای شروع نمایش موجودی، می‌تواند با توجه به نیاز تنظیم شود
+    int start_y = 0;         // موقعیت عمودی برای شروع نمایش موجودی
+
+    mvprintw(start_y, start_x, "Inventory:\n");
+
+    // نمایش سلاح‌ها
+    mvprintw(start_y + 1, start_x, "Weapons:\n");
+    for (int i = 0; i < inventory_count; i++) {
+        if (strcmp(inventory[i].type, "Weapon") == 0) {
+            mvprintw(start_y + 2 + i, start_x, "%d. %s (%s)\n", i + 1, inventory[i].name, inventory[i].type);
+        }
+    }
+    mvprintw(start_y + 2 + inventory_count, start_x, "Press the number of the item\n");
+    refresh();
+
+    int ch;
+    while ((ch = getch()) != 'i') {
+        ch -= '0';
+        if (ch >= 1 && ch <= inventory_count) {
+            if (strcmp(inventory[ch - 1].type, "Weapon") == 0) {
+                strncpy(current_weapon, inventory[ch - 1].name, ITEM_NAME_LENGTH - 1);
+                snprintf(current_message, sizeof(current_message), "You equipped %s.", current_weapon);
+            } else {
+                mvprintw(start_y + 4 + inventory_count, start_x, "You used %s.\n", inventory[ch - 1].name);
+                refresh();
+                getch(); // Wait for the user to press a key to acknowledge using the item
+            }
+        }
+    }
+
+    // پاک کردن ناحیه موجودی بعد از بستن اینونتوری
+    for (int i = start_y; i < LINES; i++) {
+        mvprintw(i, start_x, "                              ");
+    }
+    refresh();
+    inventory_open = 0;
+}
+
+// تغییر در تابع move_character
+void move_character(int *x, int *y, char *prev_cell) {
+    int ch = getch();
+    int new_x = *x, new_y = *y;
+
+    // پاک کردن پیام طلا در هر حرکت
+    if (strcmp(gold_message, "") != 0) {
+        mvprintw(0, 0, "                               "); // پاک کردن پیام قبلی
+        strcpy(gold_message, "");
+    }
+
+    if (waiting_for_direction) {
+        switch (ch) {
+            case 'h': start_continuous_move(-1, 0); break; // حرکت به چپ
+            case 'j': start_continuous_move(0, 1); break;  // حرکت به پایین
+            case 'k': start_continuous_move(0, -1); break; // حرکت به بالا
+            case 'l': start_continuous_move(1, 0); break;  // حرکت به راست
+        }
+    } else {
+        // حرکت بر اساس دکمه‌های جهت‌دار
+        switch (ch) {
+            case 'j':    new_y--; break; // پایین
+            case 'k':  new_y++; break;  // بالا
+            case 'h':  new_x--; break;  // چپ
+            case 'l': new_x++; break;  // راست
+            case 'y': new_x--; new_y--; break; // بالا چپ
+            case 'u': new_x++; new_y--; break; // بالا راست
+            case 'b': new_x--; new_y++; break; // پایین چپ
+            case 'n': new_x++; new_y++; break; // پایین راست
+            case 'i': show_inventory(); break;
+            case 'f':  // شروع حالت انتظار برای حرکت مداوم
+                waiting_for_direction = 1; break;
+        }
+    }
+
+    chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+
+    if (next_cell == 'T') {
+        mvaddch(new_y, new_x, '^'); // تبدیل تله به نقطه
+        next_cell = '^'; // تغییر حالت سلول به نقطه
+    }
+    if (next_cell == '&') {
+        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+        next_cell = '.'; // تغییر حالت سلول به نقطه
+        gold_count++;  // افزایش مقدار طلاهای جمع‌آوری شده
+
+        strcpy(gold_message, "You collected \xF0\x9F\x92\xB0!");  // پیام طلا
+        mvprintw(0, 0, gold_message);  // نمایش پیام در بالا
+        refresh();  // به‌روزرسانی صفحه
+    }
+
+    if (next_cell == 'B') {
+        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+        next_cell = '.'; // تغییر حالت سلول به نقطه
+    }
+
+    if (waiting_for_direction == 0) {
+        while (next_cell == '.' || next_cell == '#' || next_cell == '+'|| next_cell == '^') {
+            mvaddch(*y, *x, *prev_cell);  // پاک کردن موقعیت قبلی
+            *prev_cell = next_cell;
+            *x = new_x;
+            *y = new_y;
+            mvaddch(*y, *x, '@');  // جدیدترین موقعیت
+            refresh();
+            new_x += move_direction_x;
+            new_y += move_direction_y;
+            next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+        }
+        waiting_for_direction = 0;
+    } else {
+        next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+
+        if (next_cell == 'T') {
+            mvaddch(new_y, new_x, '^'); // تبدیل تله به نقطه
+            next_cell = '^'; // تغییر حالت سلول به نقطه
+        }
+        if (next_cell == '&') {
+            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+            next_cell = '.'; // تغییر حالت سلول به نقطه
+            gold_count++;  // افزایش مقدار طلاهای جمع‌آوری شده
+            strcpy(gold_message, "You collected \xF0\x9F\x92\xB0!");  // پیام طلا
+            mvprintw(0, 0, gold_message);  // نمایش پیام در بالا
+            refresh();  // به‌روزرسانی صفحه
+        }
+        if (next_cell == 'B') {
+            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+            next_cell = '.'; // تغییر حالت سلول به نقطه
+        }
+
+        if (next_cell == '.' || next_cell == '#' || next_cell == '+'|| next_cell == '^') {
+            mvaddch(*y, *x, *prev_cell); // پاک کردن موقعیت قبلی
+            *prev_cell = next_cell;
+            *x = new_x;
+            *y = new_y;
+            mvaddch(*y, *x, '@');  // نمایش شخصیت در موقعیت جدید
+        }
+    }
+}
+void show_gold_count() {
+    mvprintw(1, 0, "\xF0\x9F\x92\xB0: %d ", gold_count); // نماد طلا
+    refresh();
+}
+
+
+int main() {
+    setlocale(LC_ALL, ""); // تنظیم محل برای پشتیبانی از یونیکد
+
+    srand(time(NULL));
+    initscr();
+    noecho();
+    cbreak();
+    keypad(stdscr, TRUE);
+    start_color(); // فعال کردن رنگ‌ها
+    init_pair(1, COLOR_RED, COLOR_BLACK);  // رنگ قرمز برای تله‌ها
+    init_pair(2, COLOR_YELLOW, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
+    init_pair(3, COLOR_CYAN, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
+    init_pair(4, COLOR_MAGENTA, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
+
+    bkgd(COLOR_BLACK);  // تنظیم پس‌زمینه به مشکی
+
+    initialize_trap_map();
+    Room rooms[MAX_ROOMS];
+    create_rooms(rooms, MAX_ROOMS);
+    int black_gold_room_count = 0;
+
+    for (int i = 0; i < MAX_ROOMS; i++) {
+        draw_room(rooms[i], rooms, MAX_ROOMS);
+        add_pillars(rooms[i]); // **اضافه کردن ستون‌ها به هر اتاق**
+        place_window_in_room(&rooms[i], rooms, MAX_ROOMS); // افزودن پنجره‌ها
+        add_traps_to_room(&rooms[i]); // افزودن تله‌ها
+        add_gold_bag_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
+        add_black_gold_to_room(&rooms[i], &black_gold_room_count);
+
+    }
+
+    ensure_full_connectivity(rooms, MAX_ROOMS);
+    int player_x = rooms[0].x + 1;
+    int player_y = rooms[0].y + 1;
+    char prev_cell = '.';
+    mvaddch(player_y, player_x, '@');
+
+    while (1) {
+        move_character(&player_x, &player_y, &prev_cell);
+        show_gold_count(); // نمایش مقدار طلاهای جمع‌آوری شده
+
+        refresh();
+    }
+
+    refresh();
+    getch();
+    endwin();
+    return 0;
+}
