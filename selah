@@ -350,6 +350,110 @@ void add_gold_bag_to_room(Room *room) {
 
     }
 }
+void add_mace_to_room(Room *room) {
+    int mace_x, mace_y;
+    for (int y = 0; y < LINES; y++) {
+        for (int x = 0; x < COLS; x++) {
+            if (map[y][x] == 'M') {
+                return; // A wand is already placed, exit the function
+            }
+        }
+    }
+        do {
+            mace_x = room->x + 1 + rand() % (room->width - 2);
+            mace_y = room->y + 1 + rand() % (room->height - 2);
+        } while (map[mace_y][mace_x] == 'M'); // Ensure we don't place gold bag on another gold bag
+
+        map[mace_y][mace_x] = 'M'; // Mark position of gold bag in map
+        attron(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+        mvaddch(mace_y, mace_x, 'M'); // Display gold bag on screen
+        attroff(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+
+    }
+
+void add_dagger_to_room(Room *room) {
+    int dagger_x, dagger_y;
+    for (int y = 0; y < LINES; y++) {
+        for (int x = 0; x < COLS; x++) {
+            if (map[y][x] == 'D') {
+                return; // A wand is already placed, exit the function
+            }
+        }
+    }
+        do {
+            dagger_x = room->x + 1 + rand() % (room->width - 2);
+            dagger_y = room->y + 1 + rand() % (room->height - 2);
+        } while (map[dagger_y][dagger_x] == 'D'); // Ensure we don't place gold bag on another gold bag
+
+        map[dagger_y][dagger_x] = 'D'; // Mark position of gold bag in map
+        attron(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+        mvaddch(dagger_y, dagger_x, 'D'); // Display gold bag on screen
+        attroff(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+
+    }
+
+void add_arrow_to_room(Room *room) {
+    int arrow_x, arrow_y;
+    for (int y = 0; y < LINES; y++) {
+        for (int x = 0; x < COLS; x++) {
+            if (map[y][x] == 'A') {
+                return; // A wand is already placed, exit the function
+            }
+        }
+    }
+        do {
+            arrow_x = room->x + 1 + rand() % (room->width - 2);
+            arrow_y = room->y + 1 + rand() % (room->height - 2);
+        } while (map[arrow_y][arrow_x] == 'A'); // Ensure we don't place gold bag on another gold bag
+
+        map[arrow_y][arrow_x] = 'A'; // Mark position of gold bag in map
+        attron(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+        mvaddch(arrow_y, arrow_x, 'A'); // Display gold bag on screen
+        attroff(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+
+    }
+
+void add_sword_to_room(Room *room) {
+    int sword_x, sword_y;
+    for (int y = 0; y < LINES; y++) {
+        for (int x = 0; x < COLS; x++) {
+            if (map[y][x] == 'S') {
+                return; // A wand is already placed, exit the function
+            }
+        }
+    }
+        do {
+            sword_x = room->x + 1 + rand() % (room->width - 2);
+            sword_y = room->y + 1 + rand() % (room->height - 2);
+        } while (map[sword_y][sword_x] == 'S'); // Ensure we don't place gold bag on another gold bag
+
+        map[sword_y][sword_x] = 'S'; // Mark position of gold bag in map
+        attron(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+        mvaddch(sword_y, sword_x, 'S'); // Display gold bag on screen
+        attroff(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+
+    }
+
+void add_wand_to_room(Room *room) {
+    int wand_x, wand_y;
+    for (int y = 0; y < LINES; y++) {
+        for (int x = 0; x < COLS; x++) {
+            if (map[y][x] == 'W') {
+                return; // A wand is already placed, exit the function
+            }
+        }
+    }
+        do {
+            wand_x = room->x + 1 + rand() % (room->width - 2);
+            wand_y = room->y + 1 + rand() % (room->height - 2);
+        } while (map[wand_y][wand_x] == 'W'); // Ensure we don't place gold bag on another gold bag
+
+        map[wand_y][wand_x] = 'W'; // Mark position of gold bag in map
+        attron(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+        mvaddch(wand_y, wand_x, 'W'); // Display gold bag on screen
+        attroff(COLOR_PAIR(5)); // استفاده از رنگ قرمز برای تله‌ها
+
+    }
 void add_black_gold_to_room(Room *room, int *black_gold_room_count) {
     // فقط اگر تعداد اتاق‌های دارای طلای سیاه کمتر از 2 باشد، طلای سیاه اضافه کن
     if (*black_gold_room_count < 2) {
@@ -384,21 +488,7 @@ void add_to_inventory(const char* item_name, const char* item_type) {
         printw("Inventory is full. Cannot add more items.\n");
     }
 }
-void add_mace_to_inventory() {
-    add_to_inventory("\u2692", "Weapon");
-}
-void add_sword_to_inventory() {
-    add_to_inventory("\u2694", "Weapon");
-}
-void add_dagger_to_inventory() {
-    add_to_inventory("\U0001F5E1", "Weapon");
-}
-void add_arrow_to_inventory() {
-    add_to_inventory("\u27B3", "Weapon");
-}
-void add_wand_to_inventory() {
-    add_to_inventory("\U0001FA84", "Weapon");
-}
+
 void show_inventory() {
     int start_x = COLS - 30; // موقعیت افقی برای شروع نمایش موجودی، می‌تواند با توجه به نیاز تنظیم شود
     int start_y = 0;         // موقعیت عمودی برای شروع نمایش موجودی
@@ -493,6 +583,26 @@ void move_character(int *x, int *y, char *prev_cell) {
         mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
         next_cell = '.'; // تغییر حالت سلول به نقطه
     }
+    if (next_cell == 'M') {
+        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+        next_cell = '.'; // تغییر حالت سلول به نقطه
+    }
+    if (next_cell == 'S') {
+        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+        next_cell = '.'; // تغییر حالت سلول به نقطه
+    }
+    if (next_cell == 'A') {
+        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+        next_cell = '.'; // تغییر حالت سلول به نقطه
+    }
+    if (next_cell == 'W') {
+        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+        next_cell = '.'; // تغییر حالت سلول به نقطه
+    }
+    if (next_cell == 'D') {
+        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+        next_cell = '.'; // تغییر حالت سلول به نقطه
+    }
 
     if (waiting_for_direction == 0) {
         while (next_cell == '.' || next_cell == '#' || next_cell == '+'|| next_cell == '^') {
@@ -526,6 +636,27 @@ void move_character(int *x, int *y, char *prev_cell) {
             mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
             next_cell = '.'; // تغییر حالت سلول به نقطه
         }
+        if (next_cell == 'M') {
+            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+            next_cell = '.'; // تغییر حالت سلول به نقطه
+        }
+        if (next_cell == 'S') {
+            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+            next_cell = '.'; // تغییر حالت سلول به نقطه
+        }
+        if (next_cell == 'A') {
+            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+            next_cell = '.'; // تغییر حالت سلول به نقطه
+        }
+        if (next_cell == 'W') {
+            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+            next_cell = '.'; // تغییر حالت سلول به نقطه
+        }
+        if (next_cell == 'D') {
+            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
+            next_cell = '.'; // تغییر حالت سلول به نقطه
+        }
+
 
         if (next_cell == '.' || next_cell == '#' || next_cell == '+'|| next_cell == '^') {
             mvaddch(*y, *x, *prev_cell); // پاک کردن موقعیت قبلی
@@ -555,6 +686,7 @@ int main() {
     init_pair(2, COLOR_YELLOW, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
     init_pair(3, COLOR_CYAN, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
     init_pair(4, COLOR_MAGENTA, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
+    init_pair(5, COLOR_BLUE, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
 
     bkgd(COLOR_BLACK);  // تنظیم پس‌زمینه به مشکی
 
@@ -570,6 +702,11 @@ int main() {
         add_traps_to_room(&rooms[i]); // افزودن تله‌ها
         add_gold_bag_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
         add_black_gold_to_room(&rooms[i], &black_gold_room_count);
+        add_mace_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
+        add_dagger_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
+        add_wand_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
+        add_arrow_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
+        add_sword_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
 
     }
 
