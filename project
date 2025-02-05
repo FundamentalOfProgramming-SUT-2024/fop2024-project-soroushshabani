@@ -41,7 +41,10 @@ char map[MAX_ROWS][MAX_COLS];
 char trap_map[MAX_ROWS][MAX_COLS]; // نقشه تله‌ها
 char gold_message[50] = "";
 int gold_count = 0;
-
+int player_hp = 40;
+int placed_food = 0; // شمارش غذای قرار داده شده
+int hunger = 100;     // سطح گرسنگی (از 100 کاهش می‌یابد)
+int food_count = 0;   // تعداد غذاهای همراه بازیکن
 // بررسی تداخل اتاق‌ها
 int check_overlap(Room new_room, Room rooms[], int count) {
     for (int i = 0; i < count; i++) {
@@ -349,7 +352,61 @@ void add_gold_bag_to_room(Room *room) {
 
     }
 }
+void add_food_to_room(Room *room) {
+    for (int i = 0; i < 1; i++) { // 33% شانس برای قرار دادن غذا در اتاق
+        int food_x, food_y;
+        do {
+            food_x = room->x + 1 + rand() % (room->width - 2);
+            food_y = room->y + 1 + rand() % (room->height - 2);
+        } while (map[food_y][food_x] == 'f'); // بررسی عدم قرارگیری روی غذا دیگر
 
+        map[food_y][food_x] = 'f'; // علامت‌گذاری غذا در نقشه
+        attron(COLOR_PAIR(6)); // رنگ غذا (سبز)
+        mvaddch(food_y, food_x, 'f');
+        attroff(COLOR_PAIR(6));
+    }
+}
+void show_status() {
+    mvprintw(1, 0, "❤️ Health: %d  🍽 Hunger: %d  🍎 Food: %d", player_hp, hunger, food_count);
+    refresh();
+}
+void add_food_to_inventory() {
+    if (food_count < 5) { // حداکثر ۵ واحد غذا
+        food_count++;
+        mvprintw(0, 0, "You picked up 🍎 Food! Total: %d", food_count);
+    } else {
+        mvprintw(0, 0, "You can't carry more food!");
+    }
+    refresh();
+}
+void decrease_hunger() {
+    if (hunger > 0) {
+        hunger--;
+    } else {
+        player_hp -= 2; // اگر گرسنگی به ۰ برسد، سلامت کاهش می‌یابد
+        if (player_hp <= 0) {
+            mvprintw(0, 0, "You died from hunger! Game Over!");
+            refresh();
+            getch();
+            endwin();
+            exit(0);
+        }
+    }
+}
+void consume_food() {
+    if (food_count > 0) {
+        food_count--;
+        hunger += 20; // کاهش گرسنگی
+        if (hunger > 100) hunger = 100;
+        player_hp += 10; // افزایش سلامت
+        if (player_hp > 40) player_hp = 40;
+
+        mvprintw(0, 0, "You ate 🍎 Food! Health: %d, Hunger: %d", player_hp, hunger);
+    } else {
+        mvprintw(0, 0, "No food to eat!");
+    }
+    refresh();
+}
 void add_mace_to_room(Room *room) {
     int mace_x, mace_y;
     for (int y = 0; y < LINES; y++) {
@@ -561,6 +618,13 @@ void show_inventory() {
     int start_x = COLS - 30; // موقعیت افقی برای شروع نمایش
     int start_y = 0;
 
+    // پاک کردن بخش اینونتوری بدون حذف نقشه
+    for (int i = 0; i < LINES; i++) {
+        move(i, start_x);
+        clrtoeol();
+    }
+
+    // نمایش اینونتوری
     mvprintw(start_y, start_x, "📦 Inventory:\n");
     mvprintw(start_y + 1, start_x, "🔫 Weapons:\n");
 
@@ -602,7 +666,33 @@ void show_inventory() {
         mvprintw(start_y + 5 + weapon_count, start_x, "No spells collected.");
     }
 
-    mvprintw(start_y + 7 + weapon_count + spell_count, start_x, "Press 'i' to exit\n");
+    // نمایش تعداد غذاها
+    mvprintw(start_y + 7 + weapon_count + spell_count, start_x, "🍎 Food: %d", food_count);
+    mvprintw(start_y + 8 + weapon_count + spell_count, start_x, "Press 'e' to eat food.");
+    mvprintw(start_y + 9 + weapon_count + spell_count, start_x, "Press 'i' to exit.");
+
+    refresh();
+
+    int key;
+    while ((key = getch()) != 'i') {  // منتظر فشردن 'i' برای خروج
+        if (key == 'e') {
+            if (food_count > 0) {
+                food_count--;
+                hunger += 20;
+                if (hunger > 100) hunger = 100;
+                player_hp += 10;
+                if (player_hp > 40) player_hp = 40;
+
+                mvprintw(start_y + 10 + weapon_count + spell_count, start_x, "You ate 🍎! HP: %d, Hunger: %d  ", player_hp, hunger);
+            } else {
+                mvprintw(start_y + 10 + weapon_count + spell_count, start_x, "No food left to eat.");
+            }
+            refresh();
+        }
+    }
+    for (int i = 0; i < 15; i++) {
+        mvprintw(start_y + i, start_x, "                              ");
+    }
     refresh();
 }
 // تغییر در تابع move_character
@@ -639,6 +729,19 @@ void move_character(int *x, int *y, char *prev_cell) {
 
     chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
 
+    // 🍎 اگر بازیکن روی غذا برود
+    if (next_cell == 'f') {
+        if (food_count < 5) {  // فقط اگر کمتر از 5 غذا داشته باشیم
+            food_count++;
+            mvprintw(0, 0, "You picked up 🍎 Food! Total: %d", food_count);
+            mvaddch(new_y, new_x, '.'); // حذف غذا از نقشه
+            next_cell = '.';
+        } else {
+            mvprintw(0, 0, "You can't carry more food!");
+        }
+        refresh();
+    }
+
     // طلای معمولی
     if (next_cell == '&') {
         mvaddch(new_y, new_x, '.');
@@ -660,6 +763,18 @@ void move_character(int *x, int *y, char *prev_cell) {
         mvaddch(new_y, new_x, '^');
         next_cell = '^';
     }
+
+    // حرکت در مسیرهای مجاز
+    if (next_cell == '.' || next_cell == '#' || next_cell == '+' || next_cell == '^' ||
+        next_cell == 'M' || next_cell == 'S' || next_cell == 'D' || next_cell == 'A' || next_cell == 'W' ||
+        next_cell == 'h' || next_cell == 'd' ||next_cell == 's' ) {
+        mvaddch(*y, *x, *prev_cell); // حذف موقعیت قبلی
+        *prev_cell = next_cell;
+        *x = new_x;
+        *y = new_y;
+        mvaddch(*y, *x, '@'); // نمایش کاراکتر در موقعیت جدید
+    }
+
 
     // سلاح‌ها (انتخابی)
     if (next_cell == 'M' || next_cell == 'S' || next_cell == 'D' || next_cell == 'A' || next_cell == 'W') {
@@ -687,6 +802,7 @@ void move_character(int *x, int *y, char *prev_cell) {
             refresh();
         }
     }
+
     if (next_cell == 'd' || next_cell == 's' || next_cell == 'h') {
         char spell_name[ITEM_NAME_LENGTH];
         char spell_icon[20];
@@ -766,6 +882,8 @@ int main() {
         add_damage_to_room(&rooms[i]);
         add_health_to_room(&rooms[i]);
         add_speed_to_room(&rooms[i]);
+        add_food_to_room(&rooms[i]);  // اضافه کردن غذا به اتاق‌ها
+
     }
 
     ensure_full_connectivity(rooms, MAX_ROOMS);
@@ -776,6 +894,20 @@ int main() {
 
     while (1) {
         move_character(&player_x, &player_y, &prev_cell);
+        mvprintw(1, 0, " \U00002764️ HP: %d   🍖 Hunger: %d ", player_hp, hunger);
+        hunger -= 1;
+        if (hunger < 0) hunger = 0;
+
+        // اگر گرسنگی به 0 برسد، بازیکن جان کم می‌کند
+        if (hunger == 0) {
+            player_hp -= 1;
+            if (player_hp <= 0) {
+                mvprintw(LINES / 2, COLS / 2 - 5, "💀 GAME OVER 💀");
+                refresh();
+                getch();
+                break;
+            }
+        }
         show_gold_count();
         refresh();
     }
