@@ -16,7 +16,11 @@
 #define MAX_COLS 100
 #define MAX_INVENTORY_ITEMS 100
 #define ITEM_NAME_LENGTH 50
-
+#define MACE_ICON "⚒"    // شلاق
+#define DAGGER_ICON "🗡"  // خنجر
+#define WAND_ICON "🪄"    // چوب جادو
+#define ARROW_ICON "🏹"   // تیر و کمان
+#define SWORD_ICON "⚔"    // شمشیر
 // نقشه بازی (صفحه نمایش که روی آن همه چیز رسم می‌شود)
 typedef struct {
     int x, y;
@@ -475,8 +479,7 @@ void add_black_gold_to_room(Room *room, int *black_gold_room_count) {
 void add_to_inventory(const char* item_name, const char* item_type) {
     for (int i = 0; i < inventory_count; i++) {
         if (strcmp(inventory[i].name, item_name) == 0 && strcmp(inventory[i].type, item_type) == 0) {
-            // آیتم قبلاً در اینونتوری وجود دارد، نیازی به افزودن مجدد نیست
-            return;
+            return; // آیتم قبلاً در اینونتوری وجود دارد
         }
     }
 
@@ -484,50 +487,50 @@ void add_to_inventory(const char* item_name, const char* item_type) {
         strncpy(inventory[inventory_count].name, item_name, ITEM_NAME_LENGTH - 1);
         strncpy(inventory[inventory_count].type, item_type, ITEM_NAME_LENGTH - 1);
         inventory_count++;
-    } else {
-        printw("Inventory is full. Cannot add more items.\n");
+
+        // نمایش پیام برداشتن آیتم همراه با استیکر صحیح
+        const char* icon = "";
+        if (strcmp(item_name, "Mace") == 0) icon = MACE_ICON;
+        else if (strcmp(item_name, "Dagger") == 0) icon = DAGGER_ICON;
+        else if (strcmp(item_name, "Wand") == 0) icon = WAND_ICON;
+        else if (strcmp(item_name, "Arrow") == 0) icon = ARROW_ICON;
+        else if (strcmp(item_name, "Sword") == 0) icon = SWORD_ICON;
+
+        snprintf(current_message, sizeof(current_message), "You picked up %s %s", icon, item_name);
+        mvprintw(0, 0, current_message); // نمایش پیام در بالای صفحه
+        refresh();
     }
 }
-
 void show_inventory() {
-    int start_x = COLS - 30; // موقعیت افقی برای شروع نمایش موجودی، می‌تواند با توجه به نیاز تنظیم شود
-    int start_y = 0;         // موقعیت عمودی برای شروع نمایش موجودی
+    int start_x = COLS - 30; // موقعیت افقی برای شروع نمایش
+    int start_y = 0;
 
-    mvprintw(start_y, start_x, "Inventory:\n");
+    mvprintw(start_y, start_x, "📦 Inventory:\n");
+    mvprintw(start_y + 1, start_x, "🔫 Weapons:\n");
 
-    // نمایش سلاح‌ها
-    mvprintw(start_y + 1, start_x, "Weapons:\n");
+    int weapon_count = 0;
     for (int i = 0; i < inventory_count; i++) {
         if (strcmp(inventory[i].type, "Weapon") == 0) {
-            mvprintw(start_y + 2 + i, start_x, "%d. %s (%s)\n", i + 1, inventory[i].name, inventory[i].type);
-        }
-    }
-    mvprintw(start_y + 2 + inventory_count, start_x, "Press the number of the item\n");
-    refresh();
+            const char* icon = "";
 
-    int ch;
-    while ((ch = getch()) != 'i') {
-        ch -= '0';
-        if (ch >= 1 && ch <= inventory_count) {
-            if (strcmp(inventory[ch - 1].type, "Weapon") == 0) {
-                strncpy(current_weapon, inventory[ch - 1].name, ITEM_NAME_LENGTH - 1);
-                snprintf(current_message, sizeof(current_message), "You equipped %s.", current_weapon);
-            } else {
-                mvprintw(start_y + 4 + inventory_count, start_x, "You used %s.\n", inventory[ch - 1].name);
-                refresh();
-                getch(); // Wait for the user to press a key to acknowledge using the item
-            }
+            if (strcmp(inventory[i].name, "Mace") == 0) icon = MACE_ICON;
+            else if (strcmp(inventory[i].name, "Dagger") == 0) icon = DAGGER_ICON;
+            else if (strcmp(inventory[i].name, "Wand") == 0) icon = WAND_ICON;
+            else if (strcmp(inventory[i].name, "Arrow") == 0) icon = ARROW_ICON;
+            else if (strcmp(inventory[i].name, "Sword") == 0) icon = SWORD_ICON;
+
+            mvprintw(start_y + 2 + weapon_count, start_x, "%d. %s %s", weapon_count + 1, icon, inventory[i].name);
+            weapon_count++;
         }
     }
 
-    // پاک کردن ناحیه موجودی بعد از بستن اینونتوری
-    for (int i = start_y; i < LINES; i++) {
-        mvprintw(i, start_x, "                              ");
+    if (weapon_count == 0) {
+        mvprintw(start_y + 2, start_x, "No weapons collected.");
     }
+
+    mvprintw(start_y + 4 + weapon_count, start_x, "Press 'i' to exit\n");
     refresh();
-    inventory_open = 0;
 }
-
 // تغییر در تابع move_character
 void move_character(int *x, int *y, char *prev_cell) {
     int ch = getch();
@@ -583,25 +586,21 @@ void move_character(int *x, int *y, char *prev_cell) {
         mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
         next_cell = '.'; // تغییر حالت سلول به نقطه
     }
-    if (next_cell == 'M') {
-        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-        next_cell = '.'; // تغییر حالت سلول به نقطه
-    }
-    if (next_cell == 'S') {
-        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-        next_cell = '.'; // تغییر حالت سلول به نقطه
-    }
-    if (next_cell == 'A') {
-        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-        next_cell = '.'; // تغییر حالت سلول به نقطه
-    }
-    if (next_cell == 'W') {
-        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-        next_cell = '.'; // تغییر حالت سلول به نقطه
-    }
-    if (next_cell == 'D') {
-        mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-        next_cell = '.'; // تغییر حالت سلول به نقطه
+    if (next_cell == 'M' || next_cell == 'S' || next_cell == 'D' || next_cell == 'A' || next_cell == 'W') {
+        char weapon_name[ITEM_NAME_LENGTH];
+
+        switch (next_cell) {
+            case 'M': strcpy(weapon_name, "Mace"); break;
+            case 'S': strcpy(weapon_name, "Sword"); break;
+            case 'D': strcpy(weapon_name, "Dagger"); break;
+            case 'A': strcpy(weapon_name, "Arrow"); break;
+            case 'W': strcpy(weapon_name, "Wand"); break;
+        }
+
+        add_to_inventory(weapon_name, "Weapon"); // ذخیره با نام درست
+        mvaddch(new_y, new_x, '.'); // حذف سلاح از نقشه
+        next_cell = '.';
+        refresh();
     }
 
     if (waiting_for_direction == 0) {
@@ -636,27 +635,22 @@ void move_character(int *x, int *y, char *prev_cell) {
             mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
             next_cell = '.'; // تغییر حالت سلول به نقطه
         }
-        if (next_cell == 'M') {
-            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-            next_cell = '.'; // تغییر حالت سلول به نقطه
-        }
-        if (next_cell == 'S') {
-            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-            next_cell = '.'; // تغییر حالت سلول به نقطه
-        }
-        if (next_cell == 'A') {
-            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-            next_cell = '.'; // تغییر حالت سلول به نقطه
-        }
-        if (next_cell == 'W') {
-            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-            next_cell = '.'; // تغییر حالت سلول به نقطه
-        }
-        if (next_cell == 'D') {
-            mvaddch(new_y, new_x, '.');  // حذف کیسه طلا از نقشه
-            next_cell = '.'; // تغییر حالت سلول به نقطه
-        }
+        if (next_cell == 'M' || next_cell == 'S' || next_cell == 'D' || next_cell == 'A' || next_cell == 'W') {
+            char weapon_name[ITEM_NAME_LENGTH];
 
+            switch (next_cell) {
+                case 'M': strcpy(weapon_name, "Mace"); break;
+                case 'S': strcpy(weapon_name, "Sword"); break;
+                case 'D': strcpy(weapon_name, "Dagger"); break;
+                case 'A': strcpy(weapon_name, "Arrow"); break;
+                case 'W': strcpy(weapon_name, "Wand"); break;
+            }
+
+            add_to_inventory(weapon_name, "Weapon"); // ذخیره با نام درست
+            mvaddch(new_y, new_x, '.'); // حذف سلاح از نقشه
+            next_cell = '.';
+            refresh();
+        }
 
         if (next_cell == '.' || next_cell == '#' || next_cell == '+'|| next_cell == '^') {
             mvaddch(*y, *x, *prev_cell); // پاک کردن موقعیت قبلی
@@ -683,10 +677,10 @@ int main() {
     keypad(stdscr, TRUE);
     start_color(); // فعال کردن رنگ‌ها
     init_pair(1, COLOR_RED, COLOR_BLACK);  // رنگ قرمز برای تله‌ها
-    init_pair(2, COLOR_YELLOW, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
-    init_pair(3, COLOR_CYAN, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
-    init_pair(4, COLOR_MAGENTA, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
-    init_pair(5, COLOR_BLUE, COLOR_BLACK); // رنگ زرد کمرنگ برای نقطه‌ها
+    init_pair(2, COLOR_YELLOW, COLOR_BLACK); // رنگ زرد برای طلا
+    init_pair(3, COLOR_CYAN, COLOR_BLACK);
+    init_pair(4, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(5, COLOR_BLUE, COLOR_BLACK);
 
     bkgd(COLOR_BLACK);  // تنظیم پس‌زمینه به مشکی
 
@@ -697,17 +691,16 @@ int main() {
 
     for (int i = 0; i < MAX_ROOMS; i++) {
         draw_room(rooms[i], rooms, MAX_ROOMS);
-        add_pillars(rooms[i]); // **اضافه کردن ستون‌ها به هر اتاق**
-        place_window_in_room(&rooms[i], rooms, MAX_ROOMS); // افزودن پنجره‌ها
-        add_traps_to_room(&rooms[i]); // افزودن تله‌ها
-        add_gold_bag_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
+        add_pillars(rooms[i]);
+        place_window_in_room(&rooms[i], rooms, MAX_ROOMS);
+        add_traps_to_room(&rooms[i]);
+        add_gold_bag_to_room(&rooms[i]);
         add_black_gold_to_room(&rooms[i], &black_gold_room_count);
-        add_mace_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
-        add_dagger_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
-        add_wand_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
-        add_arrow_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
-        add_sword_to_room(&rooms[i]); // **اضافه کردن کیسه طلا به هر اتاق**
-
+        add_mace_to_room(&rooms[i]);
+        add_dagger_to_room(&rooms[i]);
+        add_wand_to_room(&rooms[i]);
+        add_arrow_to_room(&rooms[i]);
+        add_sword_to_room(&rooms[i]);
     }
 
     ensure_full_connectivity(rooms, MAX_ROOMS);
@@ -718,12 +711,10 @@ int main() {
 
     while (1) {
         move_character(&player_x, &player_y, &prev_cell);
-        show_gold_count(); // نمایش مقدار طلاهای جمع‌آوری شده
-
+        show_gold_count();
         refresh();
     }
 
-    refresh();
     getch();
     endwin();
     return 0;
