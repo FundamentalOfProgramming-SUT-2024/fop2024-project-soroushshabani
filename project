@@ -254,7 +254,16 @@ void initialize_trap_map() {
         }
     }
 }
-
+void game_over_screen() {
+    clear();
+    attron(A_BOLD | COLOR_PAIR(1));
+    mvprintw(LINES / 2 - 1, (COLS - 10) / 2, "💀 GAME OVER 💀");
+    mvprintw(LINES / 2 + 1, (COLS - 30) / 2, "Press ENTER to return to menu...");
+    attroff(A_BOLD | COLOR_PAIR(1));
+    refresh();
+    while (getch() != '\n'); // صبر می‌کند تا کاربر Enter بزند
+    clear();
+}
 // رسم راهرو
 void draw_corridor(int sx, int sy, int ex, int ey, int cy) {
     int step;
@@ -628,67 +637,82 @@ void add_to_inventory(const char* item_name, const char* item_type) {
         refresh();
     }
 }
-void show_inventory() {
-    int start_x = COLS - 30; // موقعیت افقی برای شروع نمایش
-    int start_y = 0;
 
-    // پاک کردن بخش اینونتوری بدون حذف نقشه
-    for (int i = 0; i < LINES; i++) {
-        move(i, start_x);
+void show_inventory() {
+    int start_x = COLS - 35; // موقعیت نمایش اینونتوری
+    int start_y = 2;
+    int height = 20; // ارتفاع تقریبی اینونتوری
+
+    // ✅ پاک کردن کامل ناحیه اینونتوری قبل از نمایش جدید
+    for (int i = 0; i < height; i++) {
+        move(start_y + i - 2, start_x - 2);
         clrtoeol();
     }
 
-    // نمایش اینونتوری
-    mvprintw(start_y, start_x, "📦 Inventory:\n");
-    mvprintw(start_y + 1, start_x, "🔫 Weapons:\n");
+    // ✅ اضافه کردن قاب دور اینونتوری
+    attron(COLOR_PAIR(3));
+    mvprintw(start_y - 2, start_x - 2, "+--------------------------------+");
+    mvprintw(start_y + height - 2, start_x - 2, "+--------------------------------+");
+    attroff(COLOR_PAIR(3));
 
+    // ✅ نمایش عنوان اینونتوری
+    attron(A_BOLD);
+    mvprintw(start_y, start_x, "📦 INVENTORY");
+    attroff(A_BOLD);
+
+    // ✅ نمایش دسته‌بندی سلاح‌ها
+    mvprintw(start_y + 2, start_x, "🔫 Weapons:");
     int weapon_count = 0;
     for (int i = 0; i < inventory_count; i++) {
         if (strcmp(inventory[i].type, "Weapon") == 0) {
             const char* icon = "";
-
             if (strcmp(inventory[i].name, "Mace") == 0) icon = MACE_ICON;
             else if (strcmp(inventory[i].name, "Dagger") == 0) icon = DAGGER_ICON;
             else if (strcmp(inventory[i].name, "Wand") == 0) icon = WAND_ICON;
             else if (strcmp(inventory[i].name, "Arrow") == 0) icon = ARROW_ICON;
             else if (strcmp(inventory[i].name, "Sword") == 0) icon = SWORD_ICON;
 
-            mvprintw(start_y + 2 + weapon_count, start_x, "%d. %s %s", weapon_count + 1, icon, inventory[i].name);
+            mvprintw(start_y + 3 + weapon_count, start_x, "- %s %s", icon, inventory[i].name);
             weapon_count++;
+            refresh();
+            usleep(200000); // ✅ تأخیر کوتاه برای نمایش آیتم جدید
         }
     }
+    if (weapon_count == 0) mvprintw(start_y + 3, start_x, "No weapons.");
 
-    if (weapon_count == 0) {
-        mvprintw(start_y + 2, start_x, "No weapons collected.");
-    }
+    // ✅ نمایش جداکننده
+    mvhline(start_y + 4 + weapon_count, start_x, '-', 30);
 
-    mvprintw(start_y + 4 + weapon_count, start_x, "🪄 Spells:\n");
+    // ✅ نمایش دسته‌بندی طلسم‌ها
+    mvprintw(start_y + 5 + weapon_count, start_x, "🪄 Spells:");
     int spell_count = 0;
     for (int i = 0; i < inventory_count; i++) {
         if (strcmp(inventory[i].type, "Spell") == 0) {
             const char* spell_icon = "";
-            if (strcmp(inventory[i].name, "Speed") == 0) spell_icon = "🏃‍♂️";
-            else if (strcmp(inventory[i].name, "Health") == 0) spell_icon = "❤️";
-            else if (strcmp(inventory[i].name, "Damage") == 0) spell_icon = "🔥";
+            if (strcmp(inventory[i].name, "Speed") == 0) spell_icon = speed_ICON;
+            else if (strcmp(inventory[i].name, "Health") == 0) spell_icon = health_ICON;
+            else if (strcmp(inventory[i].name, "Damage") == 0) spell_icon = damage_ICON;
 
-            mvprintw(start_y + 5 + weapon_count + spell_count, start_x, "%d. %s %s", spell_count + 1, spell_icon, inventory[i].name);
+            mvprintw(start_y + 6 + weapon_count + spell_count, start_x, "- %s %s", spell_icon, inventory[i].name);
             spell_count++;
+            refresh();
+            usleep(200000); // ✅ تأخیر کوتاه برای نمایش آیتم جدید
         }
     }
+    if (spell_count == 0) mvprintw(start_y + 6 + weapon_count, start_x, "No spells.");
 
-    if (spell_count == 0) {
-        mvprintw(start_y + 5 + weapon_count, start_x, "No spells collected.");
-    }
+    // ✅ نمایش جداکننده
+    mvhline(start_y + 7 + weapon_count + spell_count, start_x, '-', 30);
 
-    // نمایش تعداد غذاها
-    mvprintw(start_y + 7 + weapon_count + spell_count, start_x, "🍎 Food: %d", food_count);
-    mvprintw(start_y + 8 + weapon_count + spell_count, start_x, "Press 'e' to eat food.");
-    mvprintw(start_y + 9 + weapon_count + spell_count, start_x, "Press 'i' to exit.");
+    // ✅ نمایش تعداد غذاها
+    mvprintw(start_y + 8 + weapon_count + spell_count, start_x, "🍎 Food: %d", food_count);
+    mvprintw(start_y + 9 + weapon_count + spell_count, start_x, "[E] Eat  |  [I] Exit");
 
     refresh();
 
+    // ✅ کنترل ورودی برای خوردن غذا یا خروج
     int key;
-    while ((key = getch()) != 'i') {  // منتظر فشردن 'i' برای خروج
+    while ((key = getch()) != 'i') {
         if (key == 'e') {
             if (food_count > 0) {
                 food_count--;
@@ -697,15 +721,18 @@ void show_inventory() {
                 player_hp += 10;
                 if (player_hp > 40) player_hp = 40;
 
-                mvprintw(start_y + 10 + weapon_count + spell_count, start_x, "You ate 🍎! HP: %d, Hunger: %d  ", player_hp, hunger);
+                mvprintw(start_y + 10 + weapon_count + spell_count, start_x, "🍽 You ate! HP: %d, Hunger: %d  ", player_hp, hunger);
             } else {
-                mvprintw(start_y + 10 + weapon_count + spell_count, start_x, "No food left to eat.");
+                mvprintw(start_y + 10 + weapon_count + spell_count, start_x, "🚫 No food left!");
             }
             refresh();
         }
     }
-    for (int i = 0; i < 15; i++) {
-        mvprintw(start_y + i, start_x, "                              ");
+
+    // ✅ پاک کردن کل ناحیه بعد از خروج
+    for (int i = 0; i < height; i++) {
+        move(start_y + i - 2, start_x - 2);
+        clrtoeol();
     }
     refresh();
 }
@@ -886,12 +913,12 @@ void move_character(int *x, int *y, char *prev_cell, GameState *game_state) {
         }
 
         // نمایش پیام برای برداشتن سلاح
-        mvprintw(0, 0, "Press 'y' to pick up %s %s", weapon_icon, weapon_name);
+        mvprintw(0, 0, "Press 'r' to pick up %s %s", weapon_icon, weapon_name);
         refresh();
 
         // بررسی اینکه آیا کلید `y` در حرکت بعدی فشرده شده است یا خیر
         int key = getch();
-        if (key == 'y') {
+        if (key == 'r') {
             add_to_inventory(weapon_name, "Weapon");
             mvaddch(new_y, new_x, '.'); // حذف سلاح از نقشه
             next_cell = '.';
@@ -910,12 +937,12 @@ void move_character(int *x, int *y, char *prev_cell, GameState *game_state) {
         }
 
         // نمایش پیام برای برداشتن سلاح
-        mvprintw(0, 0, "Press 'y' to pick up %s %s", spell_icon, spell_name);
+        mvprintw(0, 0, "Press 'r' to pick up %s %s", spell_icon, spell_name);
         refresh();
 
         // بررسی اینکه آیا کلید `y` در حرکت بعدی فشرده شده است یا خیر
         int key = getch();
-        if (key == 'y') {
+        if (key == 'r') {
             add_to_inventory(spell_name, "Spell");
             mvaddch(new_y, new_x, '.'); // حذف سلاح از نقشه
             next_cell = '.';
@@ -1007,11 +1034,8 @@ void start_game() {
         if (hunger == 0) {
             player_hp -= 1;
             if (player_hp <= 0) {
-                mvprintw(LINES / 2, COLS / 2 - 10, "💀 GAME OVER! 💀");
-                refresh();
-                getch();
-                break;
-            }
+                game_over_screen();
+                return;            }
         }
         show_gold_count();
         refresh();
@@ -1251,7 +1275,64 @@ void show_menu(const char *choices[], int n_choices, FILE *file) {
         }
     }
 }
+void type_text(const char *text, int row, int col) {
+    for (int i = 0; i < strlen(text); i++) {
+        mvprintw(row, col + i, "%c", text[i]);
+        refresh();
+        usleep(50000); // 50 میلی‌ثانیه تأخیر بین هر حرف
+    }
+}
+void show_loading_animation() {
+    const char *loading = "Loading";
+    for (int i = 0; i < 3; i++) {
+        mvprintw(LINES - 2, (COLS - 10) / 2, "%s", loading);
+        refresh();
+        usleep(300000); // 300 میلی‌ثانیه
+        mvprintw(LINES - 2, (COLS - 10) / 2, "       "); // پاک کردن متن
+        refresh();
+        usleep(300000);
+    }
+}
+void show_ascii_art() {
+    clear();
+    start_color();
+    init_pair(1, COLOR_WHITE, COLOR_BLACK);
+    bkgd(COLOR_PAIR(1)); // تنظیم پس‌زمینه مشکی
 
+    int start_y = (LINES - 8) / 2;
+    int x_offset = (COLS - 90) / 2;
+
+    attron(COLOR_PAIR(1));
+    mvprintw(start_y, x_offset, "░▒▓████████▓▒░▒▓██████▓▒░░▒▓███████▓▒░       ░▒▓███████▓▒░░▒▓████████▓▒░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░ ");
+    mvprintw(start_y + 1, x_offset, "░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░             ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ");
+    mvprintw(start_y + 2, x_offset, "░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░             ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ");
+    mvprintw(start_y + 3, x_offset, "░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░        ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░░▒▓████████▓▒░ ");
+    mvprintw(start_y + 4, x_offset, "░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░ ");
+    mvprintw(start_y + 5, x_offset, "░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░ ");
+    mvprintw(start_y + 6, x_offset, "░▒▓█▓▒░      ░▒▓██████▓▒░░▒▓█▓▒░             ░▒▓████████▓▒░▒▓████████▓▒░▒▓████████▓▒░      ░▒▓█▓▒░ ");
+
+    // خط جداکننده
+    mvhline(start_y + 7, (COLS - 50) / 2, '-', 50);
+
+    // متن چشمک‌زن
+    attron(A_BOLD | A_BLINK);
+    mvprintw(start_y + 10, (COLS - 20) / 2, "🔥 WELCOME TO FOP 2024 🔥");
+    attroff(A_BOLD | A_BLINK);
+
+    // پیام تایپ شونده
+    type_text("Press ENTER to continue...", start_y + 12, (COLS - 20) / 2);
+
+    // جمله انگیزشی
+    mvprintw(start_y + 14, (COLS - 40) / 2, "\"The journey of a thousand miles begins with one step.\"");
+
+    attroff(COLOR_PAIR(1));
+    refresh();
+
+    // انیمیشن بارگذاری
+    show_loading_animation();
+
+    while (getch() != '\n');  // انتظار برای Enter
+}
 int main() {
     setlocale(LC_ALL, "");
     FILE *file = fopen("usersfile", "a+b");
@@ -1265,8 +1346,12 @@ int main() {
     noecho();
     keypad(stdscr, TRUE);
 
-    const char *choices[] = {"Register", "Login", "Forgot Password", "Login as Guest", "Exit"};
-    show_menu(choices, 5, file);
+    while (1) {  // حلقه بی‌نهایت برای بازگشت به منو پس از Game Over
+        show_ascii_art();  // نمایش FOP 2024 با ASCII Art
+        show_loading_animation();
+        const char *choices[] = {"Register", "Login", "Forgot Password", "Login as Guest", "Exit"};
+        show_menu(choices, 5, file);
+    }
 
     fclose(file);
     endwin();
