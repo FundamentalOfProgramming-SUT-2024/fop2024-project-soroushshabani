@@ -52,7 +52,7 @@ char gold_message[50] = "";
 int gold_count = 0;
 int player_hp = 40;
 int placed_food = 0; // شمارش غذای قرار داده شده
-int hunger = 10;
+int hunger = 60;
 int food_count = 0;   // تعداد غذاهای همراه بازیکن
 char *background_music = "/Users/soroushshabani/Downloads/Hans Zimmer - cornfield chase (320).mp3";// بررسی تداخل اتاق‌ها
 int check_overlap(Room new_room, Room rooms[], int count) {
@@ -375,33 +375,33 @@ void add_food_to_room(Room *room) {
         attroff(COLOR_PAIR(6));
     }
 }
-void show_status() {
-    mvprintw(1, 0, "❤️ Health: %d  🍽 Hunger: %d  🍎 Food: %d", player_hp, hunger, food_count);
-    refresh();
-}
-void add_food_to_inventory() {
-    if (food_count < 5) { // حداکثر ۵ واحد غذا
-        food_count++;
-        mvprintw(0, 0, "You picked up 🍎 Food! Total: %d", food_count);
-    } else {
-        mvprintw(0, 0, "You can't carry more food!");
-    }
-    refresh();
-}
-void decrease_hunger() {
-    if (hunger > 0) {
-        hunger--;
-    } else {
-        player_hp -= 2; // اگر گرسنگی به ۰ برسد، سلامت کاهش می‌یابد
-        if (player_hp <= 0) {
-            mvprintw(0, 0, "You died from hunger! Game Over!");
-            refresh();
-            getch();
-            endwin();
-            exit(0);
-        }
-    }
-}
+//void show_status() {
+//    mvprintw(1, 0, "❤️ Health: %d  🍽 Hunger: %d  🍎 Food: %d", player_hp, hunger, food_count);
+//    refresh();
+//}
+//void add_food_to_inventory() {
+//    if (food_count < 5) { // حداکثر ۵ واحد غذا
+//        food_count++;
+//        mvprintw(0, 0, "You picked up 🍎 Food! Total: %d", food_count);
+//    } else {
+//        mvprintw(0, 0, "You can't carry more food!");
+//    }
+//    refresh();
+//}
+//void decrease_hunger() {
+//    if (hunger > 0) {
+//        hunger--;
+//    } else {
+//        player_hp -= 2; // اگر گرسنگی به ۰ برسد، سلامت کاهش می‌یابد
+//        if (player_hp <= 0) {
+//            mvprintw(0, 0, "You died from hunger! Game Over!");
+//            refresh();
+//            getch();
+//            endwin();
+//            exit(0);
+//        }
+//    }
+//}
 //void consume_food() {
 //    if (food_count > 0) {
 //        food_count--;
@@ -939,8 +939,7 @@ void show_gold_count() {
     refresh();
 }
 
-int main() {
-
+void start_game() {
     setlocale(LC_ALL, ""); // تنظیم محل برای پشتیبانی از یونیکد
     play_background_music(background_music); // پخش آهنگ در پس‌زمینه
 
@@ -950,8 +949,9 @@ int main() {
     cbreak();
     keypad(stdscr, TRUE);
     start_color(); // فعال کردن رنگ‌ها
-    init_pair(1, COLOR_RED, COLOR_BLACK);  // رنگ قرمز برای تله‌ها
-    init_pair(2, COLOR_YELLOW, COLOR_BLACK); // رنگ زرد برای طلا
+
+    init_pair(1, COLOR_RED, COLOR_BLACK);
+    init_pair(2, COLOR_YELLOW, COLOR_BLACK);
     init_pair(3, COLOR_CYAN, COLOR_BLACK);
     init_pair(4, COLOR_MAGENTA, COLOR_BLACK);
     init_pair(5, COLOR_BLUE, COLOR_BLACK);
@@ -979,8 +979,7 @@ int main() {
         add_damage_to_room(&rooms[i]);
         add_health_to_room(&rooms[i]);
         add_speed_to_room(&rooms[i]);
-        add_food_to_room(&rooms[i]);  // اضافه کردن غذا به اتاق‌ها
-
+        add_food_to_room(&rooms[i]);
     }
 
     ensure_full_connectivity(rooms, MAX_ROOMS);
@@ -988,6 +987,7 @@ int main() {
     int player_y = rooms[0].y + 1;
     char prev_cell = '.';
     mvaddch(player_y, player_x, '@');
+
     GameState game_state;
     game_state.player_x = player_x;
     game_state.player_y = player_y;
@@ -997,27 +997,17 @@ int main() {
     game_state.gold_count = gold_count;
     game_state.inventory_count = inventory_count;
     memcpy(game_state.inventory, inventory, sizeof(inventory));
+
     while (1) {
         move_character(&player_x, &player_y, &prev_cell, &game_state);
-        mvprintw(1, 0, " \U00002764️ HP: %d   🍖 Hunger: %d ", player_hp, hunger);
+        mvprintw(1, 0, "❤️ HP: %d   🍖 Hunger: %d ", player_hp, hunger);
         hunger -= 1;
         if (hunger < 0) hunger = 0;
 
-        // اگر گرسنگی به 0 برسد، بازیکن جان کم می‌کند
         if (hunger == 0) {
             player_hp -= 1;
             if (player_hp <= 0) {
-                int center_x = COLS / 2 - 60;
-                int center_y = LINES / 2 - 3;
-
-                mvprintw(center_y, center_x,     " ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓██████████████▓▒░░▒▓████████▓▒░       ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓███████▓▒░  ");
-                mvprintw(center_y + 1, center_x, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░ ");
-                mvprintw(center_y + 2, center_x, "░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░ ");
-                mvprintw(center_y + 3, center_x, "░▒▓█▓▒▒▓███▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓██████▓▒░        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒▒▓█▓▒░░▒▓██████▓▒░ ░▒▓███████▓▒░  ");
-                mvprintw(center_y + 4, center_x, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▓█▓▒░ ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░ ");
-                mvprintw(center_y + 5, center_x, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▓█▓▒░ ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░ ");
-                mvprintw(center_y + 6, center_x, " ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░       ░▒▓██████▓▒░   ░▒▓██▓▒░  ░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░ ");
-
+                mvprintw(LINES / 2, COLS / 2 - 10, "💀 GAME OVER! 💀");
                 refresh();
                 getch();
                 break;
@@ -1028,6 +1018,257 @@ int main() {
     }
 
     getch();
+    endwin();
+}
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <ncurses.h>
+#include <time.h>
+
+typedef struct {
+    char username[100];
+    char password[100];
+    char email[100];
+} User;
+
+int checkemail(const char *email) {
+    const char *at = strchr(email, '@');
+    if (at == NULL || at == email || strchr(at, '.') == NULL) {
+        return 0;
+    }
+    return 1;
+}
+
+void generate_random_password(char *password, int length) {
+    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    int has_digit = 0, has_upper = 0, has_lower = 0;
+    srand(time(NULL));
+    for (int i = 0; i < length - 3; i++) {
+        int key = rand() % (int)(sizeof(charset) - 1);
+        password[i] = charset[key];
+        if (isdigit(password[i])) has_digit = 1;
+        if (isupper(password[i])) has_upper = 1;
+        if (islower(password[i])) has_lower = 1;
+    }
+    if (!has_digit) password[length - 3] = '0' + rand() % 10;
+    if (!has_upper) password[length - 2] = 'A' + rand() % 26;
+    if (!has_lower) password[length - 1] = 'a' + rand() % 26;
+    password[length] = '\0';
+}
+
+int checkpassword(const char *password) {
+    if (strlen(password) < 7) {
+        return 0;
+    }
+    int has_digit = 0, has_upper = 0, has_lower = 0;
+    for (int i = 0; password[i]; i++) {
+        if (isdigit(password[i])) has_digit = 1;
+        if (isupper(password[i])) has_upper = 1;
+        if (islower(password[i])) has_lower = 1;
+    }
+    return has_digit && has_upper && has_lower;
+}
+
+int checkusername(FILE *file, const char *username) {
+    User user;
+    rewind(file);
+    while (fread(&user, sizeof(User), 1, file)) {
+        if (strcmp(user.username, username) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void get_input(const char *prompt, char *input, int size) {
+    clear();
+    echo();
+    mvprintw(LINES / 2, (COLS - strlen(prompt)) / 2, "%s", prompt);
+    refresh();
+    getnstr(input, size);
+    noecho();
+    clear();
+}
+
+int authenticate_user(FILE *file, const char *username, const char *password) {
+    User user;
+    rewind(file);
+    while (fread(&user, sizeof(User), 1, file)) {
+        if (strcmp(user.username, username) == 0 && strcmp(user.password, password) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void signin(FILE *file) {
+    User new_user;
+    char choice;
+
+    get_input("Enter username: ", new_user.username, 100);
+    if (checkusername(file, new_user.username)) {
+        mvprintw(LINES / 2, (COLS - 30) / 2, "Error: Username already exists.");
+        getch();
+        return;
+    }
+
+    mvprintw(LINES / 2, (COLS - 45) / 2, "Do you want a random password? (y/n): ");
+    choice = getch();
+    clear();
+
+    if (choice == 'y' || choice == 'Y') {
+        generate_random_password(new_user.password, 10);
+        mvprintw(LINES / 2, (COLS - 30) / 2, "Random Password: %s", new_user.password);
+        getch();
+    } else {
+        get_input("Enter password: ", new_user.password, 100);
+        if (!checkpassword(new_user.password)) {
+            mvprintw(LINES / 2, (COLS - 50) / 2, "Error: Password must be at least 7 characters with upper, lower, digit.");
+            getch();
+            return;
+        }
+    }
+
+    get_input("Enter email: ", new_user.email, 100);
+    if (!checkemail(new_user.email)) {
+        mvprintw(LINES / 2, (COLS - 30) / 2, "Error: Invalid email format.");
+        getch();
+        return;
+    }
+
+    fwrite(&new_user, sizeof(User), 1, file);
+    mvprintw(LINES / 2, (COLS - 30) / 2, "User registered successfully.");
+    getch();
+}
+void forgot_password(FILE *file) {
+    char username[100], email[100];
+    User user;
+    int found = 0;
+
+    get_input("Enter your username: ", username, 100);
+    get_input("Enter your email: ", email, 100);
+
+    rewind(file);
+    while (fread(&user, sizeof(User), 1, file)) {
+        if (strcmp(user.username, username) == 0 && strcmp(user.email, email) == 0) {
+            found = 1;
+            break;
+        }
+    }
+
+    clear();
+    if (found) {
+        mvprintw(LINES / 2, (COLS - 30) / 2, "✅ Password sent to email.");
+    } else {
+        mvprintw(LINES / 2, (COLS - 30) / 2, "❌ Username or email incorrect.");
+    }
+
+    getch(); // منتظر فشردن کلید بماند
+}
+
+void login(FILE *file) {
+    char username[100], password[100];
+
+    get_input("Enter username: ", username, 100);
+    get_input("Enter password: ", password, 100);
+
+    if (authenticate_user(file, username, password)) {
+        mvprintw(LINES / 2, (COLS - 20) / 2, "Login successful!");
+        getch();
+        clear();
+        start_game();  // اجرای بازی بعد از لاگین موفق
+    } else {
+        mvprintw(LINES / 2, (COLS - 30) / 2, "Error: Invalid username or password.");
+        getch();
+    }
+}
+
+void login_guest() {
+    clear();
+    mvprintw(LINES / 2, (COLS - 20) / 2, "Logged in as guest.");
+    getch();
+    clear();
+    start_game();  // اجرای بازی برای مهمان
+}
+
+void show_menu(const char *choices[], int n_choices, FILE *file) {
+    int pos = 0;
+    WINDOW *menu_win = newwin(15, 50, (LINES - 15) / 2, (COLS - 50) / 2);
+    keypad(menu_win, TRUE);
+    box(menu_win, 0, 0);
+
+    start_color();
+    init_pair(1, COLOR_WHITE, COLOR_BLACK);
+    init_pair(2, COLOR_BLACK, COLOR_WHITE);
+
+    while (1) {
+        clear();
+        refresh();
+
+        wclear(menu_win);
+        box(menu_win, 0, 0);
+        mvwprintw(menu_win, 1, (50 - strlen("MAIN MENU")) / 2, "MAIN MENU");
+
+        for (int i = 0; i < n_choices; i++) {
+            if (i == pos) {
+                wattron(menu_win, COLOR_PAIR(2));
+                mvwprintw(menu_win, i + 3, 5, "> %s", choices[i]);
+                wattroff(menu_win, COLOR_PAIR(2));
+            } else {
+                wattron(menu_win, COLOR_PAIR(1));
+                mvwprintw(menu_win, i + 3, 5, "  %s", choices[i]);
+                wattroff(menu_win, COLOR_PAIR(1));
+            }
+        }
+
+        const char *instruction = "Use arrow keys to navigate and Enter to select.";
+        mvwprintw(menu_win, 12, (50 - strlen(instruction)) / 2, "%s", instruction);
+        wrefresh(menu_win);
+
+        int input = wgetch(menu_win);
+        if (input == KEY_UP && pos > 0) pos--;
+        else if (input == KEY_DOWN && pos < n_choices - 1) pos++;
+        else if (input == '\n') {
+            delwin(menu_win); // حذف پنجره منو قبل از عملیات بعدی
+
+            if (pos == 0) signin(file);
+            else if (pos == 1) login(file);
+            else if (pos == 2) forgot_password(file);
+            else if (pos == 3) login_guest();
+            else {
+                fclose(file);
+                endwin();
+                exit(0);
+            }
+
+            // بازسازی پنجره منو بعد از عملیات
+            menu_win = newwin(15, 50, (LINES - 15) / 2, (COLS - 50) / 2);
+            keypad(menu_win, TRUE);
+            box(menu_win, 0, 0);
+        }
+    }
+}
+
+int main() {
+    setlocale(LC_ALL, "");
+    FILE *file = fopen("usersfile", "a+b");
+    if (!file) {
+        perror("Error opening file");
+        return 1;
+    }
+
+    initscr();
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE);
+
+    const char *choices[] = {"Register", "Login", "Forgot Password", "Login as Guest", "Exit"};
+    show_menu(choices, 5, file);
+
+    fclose(file);
     endwin();
     return 0;
 }
