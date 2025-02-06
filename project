@@ -3,6 +3,7 @@
 #include <time.h>
 #include <locale.h>
 #include <string.h>
+#include <unistd.h>
 
 // تنظیمات اتاق‌ها
 #define MAX_ROOMS 6
@@ -33,7 +34,15 @@ typedef struct {
     char name[ITEM_NAME_LENGTH];
     char type[ITEM_NAME_LENGTH]; // نوع آیتم مانند غذا، اسلحه، طلسم
 } Item;
-
+typedef struct {
+    int player_x, player_y; // موقعیت بازیکن
+    int player_hp;
+    int hunger;
+    int food_count;
+    int gold_count;
+    Item inventory[MAX_INVENTORY_ITEMS]; // آیتم‌های اینونتوری
+    int inventory_count;
+} GameState;
 Item inventory[MAX_INVENTORY_ITEMS];
 int inventory_count = 0;
 char current_message[100] = ""; // متغیری برای ذخیره پیام فعلی
@@ -43,9 +52,9 @@ char gold_message[50] = "";
 int gold_count = 0;
 int player_hp = 40;
 int placed_food = 0; // شمارش غذای قرار داده شده
-int hunger = 100;     // سطح گرسنگی (از 100 کاهش می‌یابد)
+int hunger = 10;
 int food_count = 0;   // تعداد غذاهای همراه بازیکن
-// بررسی تداخل اتاق‌ها
+char *background_music = "/Users/soroushshabani/Downloads/Hans Zimmer - cornfield chase (320).mp3";// بررسی تداخل اتاق‌ها
 int check_overlap(Room new_room, Room rooms[], int count) {
     for (int i = 0; i < count; i++) {
         if (new_room.x < rooms[i].x + rooms[i].width + ROOM_PADDING &&
@@ -393,20 +402,20 @@ void decrease_hunger() {
         }
     }
 }
-void consume_food() {
-    if (food_count > 0) {
-        food_count--;
-        hunger += 20; // کاهش گرسنگی
-        if (hunger > 100) hunger = 100;
-        player_hp += 10; // افزایش سلامت
-        if (player_hp > 40) player_hp = 40;
-
-        mvprintw(0, 0, "You ate 🍎 Food! Health: %d, Hunger: %d", player_hp, hunger);
-    } else {
-        mvprintw(0, 0, "No food to eat!");
-    }
-    refresh();
-}
+//void consume_food() {
+//    if (food_count > 0) {
+//        food_count--;
+//        hunger += 20; // کاهش گرسنگی
+//        if (hunger > 100) hunger = 100;
+//        player_hp += 10; // افزایش سلامت
+//        if (player_hp > 40) player_hp = 40;
+//
+//        mvprintw(0, 0, "You ate 🍎 Food! Health: %d, Hunger: %d", player_hp, hunger);
+//    } else {
+//        mvprintw(0, 0, "No food to eat!");
+//    }
+//    refresh();
+//}
 void add_mace_to_room(Room *room) {
     int mace_x, mace_y;
     for (int y = 0; y < LINES; y++) {
@@ -588,7 +597,12 @@ void add_black_gold_to_room(Room *room, int *black_gold_room_count) {
         (*black_gold_room_count)++; // افزایش شمارنده اتاق‌های دارای طلای سیاه
     }
 }
-
+void play_background_music(const char *music) {
+    if (fork() == 0) { // ایجاد پردازش فرزند برای پخش آهنگ بدون توقف بازی
+        execlp("afplay", "afplay", music, NULL);
+        exit(0);
+    }
+}
 void add_to_inventory(const char* item_name, const char* item_type) {
     for (int i = 0; i < inventory_count; i++) {
         if (strcmp(inventory[i].name, item_name) == 0 && strcmp(inventory[i].type, item_type) == 0) {
@@ -695,8 +709,57 @@ void show_inventory() {
     }
     refresh();
 }
+char save_message[100] = "";  // ذخیره پیام ذخیره‌سازی
+int save_message_counter = 0; // شمارنده برای حذف پیام
+void save_game(const char* filename, GameState* game_state) {
+    FILE *file = fopen(filename, "wb");
+    if (file) {
+        fwrite(game_state, sizeof(GameState), 1, file);
+        fclose(file);
+
+        strcpy(save_message, "✅ Game saved successfully!");
+        save_message_counter = 3;  // بعد از ۵ حرکت حذف شود
+    } else {
+        strcpy(save_message, "❌ Error: Unable to save the game!");
+        save_message_counter = 3;  // بعد از ۵ حرکت حذف شود
+    }
+}
+int load_game(const char* filename, GameState* game_state) {
+    FILE *file = fopen(filename, "rb");
+    if (file) {
+        fread(game_state, sizeof(GameState), 1, file);
+        fclose(file);
+        printw("✅ Game loaded successfully!\n");
+        return 1; // موفقیت
+    } else {
+        printw("❌ Error: Unable to load the game!\n");
+        return 0; // شکست
+    }
+    refresh();
+}
+void add_save_file_to_list(const char* filename) {
+    FILE *file = fopen("save_list.txt", "a");
+    if (file) {
+        fprintf(file, "%s\n", filename);
+        fclose(file);
+    }
+}
+void load_save_list() {
+    FILE *file = fopen("save_list.txt", "r");
+    if (file) {
+        char line[50];
+        printw("📂 Saved games:\n");
+        while (fgets(line, sizeof(line), file)) {
+            printw("%s", line);
+        }
+        fclose(file);
+    } else {
+        printw("⚠️ No saved games found!\n");
+    }
+    refresh();
+}
 // تغییر در تابع move_character
-void move_character(int *x, int *y, char *prev_cell) {
+void move_character(int *x, int *y, char *prev_cell, GameState *game_state) {
     int ch = getch();
     int new_x = *x, new_y = *y;
 
@@ -724,12 +787,45 @@ void move_character(int *x, int *y, char *prev_cell) {
             case 'n': new_x++; new_y++; break; // پایین راست
             case 'i': show_inventory(); break;
             case 'f': waiting_for_direction = 1; break; // شروع حرکت مداوم
+            case 's': // ذخیره‌ی بازی بعد از تایید
+                mvprintw(0, 0, "💾 Save game? (y/n): ");
+                refresh();
+                int confirm = getch();
+                if (confirm == 'y') {
+                    // 📌 به‌روزرسانی اطلاعات قبل از ذخیره
+                    game_state->player_x = *x;
+                    game_state->player_y = *y;
+                    game_state->player_hp = player_hp;
+                    game_state->hunger = hunger;
+                    game_state->food_count = food_count;
+                    game_state->gold_count = gold_count;
+                    game_state->inventory_count = inventory_count;
+                    memcpy(game_state->inventory, inventory, sizeof(inventory));
+
+                    save_game("save1.dat", game_state);
+                    add_save_file_to_list("save1.dat");
+                } else {
+                    mvprintw(0, 0, "❌ Save canceled.");
+                    mvprintw(0, 0, gold_message);
+
+                }
         }
     }
 
     chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+    if (save_message_counter > 0) {
+        mvprintw(0, 0, "%s", save_message);
+        save_message_counter--;
 
-    // 🍎 اگر بازیکن روی غذا برود
+        // اگر شمارش به صفر رسید، پیام حذف شود
+        if (save_message_counter == 0) {
+            strcpy(save_message, "");
+            mvprintw(0, 0, "                                    ");  // پاک کردن متن
+        }
+    } else {
+        mvprintw(0, 0, "                                    ");  // پاک کردن پیام‌های قبلی
+    }
+    //  اگر بازیکن روی غذا برود
     if (next_cell == 'f') {
         if (food_count < 5) {  // فقط اگر کمتر از 5 غذا داشته باشیم
             food_count++;
@@ -843,9 +939,10 @@ void show_gold_count() {
     refresh();
 }
 
-
 int main() {
+
     setlocale(LC_ALL, ""); // تنظیم محل برای پشتیبانی از یونیکد
+    play_background_music(background_music); // پخش آهنگ در پس‌زمینه
 
     srand(time(NULL));
     initscr();
@@ -891,9 +988,17 @@ int main() {
     int player_y = rooms[0].y + 1;
     char prev_cell = '.';
     mvaddch(player_y, player_x, '@');
-
+    GameState game_state;
+    game_state.player_x = player_x;
+    game_state.player_y = player_y;
+    game_state.player_hp = player_hp;
+    game_state.hunger = hunger;
+    game_state.food_count = food_count;
+    game_state.gold_count = gold_count;
+    game_state.inventory_count = inventory_count;
+    memcpy(game_state.inventory, inventory, sizeof(inventory));
     while (1) {
-        move_character(&player_x, &player_y, &prev_cell);
+        move_character(&player_x, &player_y, &prev_cell, &game_state);
         mvprintw(1, 0, " \U00002764️ HP: %d   🍖 Hunger: %d ", player_hp, hunger);
         hunger -= 1;
         if (hunger < 0) hunger = 0;
@@ -902,7 +1007,17 @@ int main() {
         if (hunger == 0) {
             player_hp -= 1;
             if (player_hp <= 0) {
-                mvprintw(LINES / 2, COLS / 2 - 5, "💀 GAME OVER 💀");
+                int center_x = COLS / 2 - 60;
+                int center_y = LINES / 2 - 3;
+
+                mvprintw(center_y, center_x,     " ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓██████████████▓▒░░▒▓████████▓▒░       ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░▒▓███████▓▒░  ");
+                mvprintw(center_y + 1, center_x, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░ ");
+                mvprintw(center_y + 2, center_x, "░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░ ");
+                mvprintw(center_y + 3, center_x, "░▒▓█▓▒▒▓███▓▒░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓██████▓▒░        ░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒▒▓█▓▒░░▒▓██████▓▒░ ░▒▓███████▓▒░  ");
+                mvprintw(center_y + 4, center_x, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▓█▓▒░ ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░ ");
+                mvprintw(center_y + 5, center_x, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░░▒▓█▓▒░ ░▒▓█▓▓█▓▒░ ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░ ");
+                mvprintw(center_y + 6, center_x, " ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░       ░▒▓██████▓▒░   ░▒▓██▓▒░  ░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░ ");
+
                 refresh();
                 getch();
                 break;
