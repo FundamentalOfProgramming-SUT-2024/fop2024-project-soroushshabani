@@ -25,14 +25,27 @@
 #define speed_ICON "🏃‍♂️"    // شمشیر
 #define health_ICON "❤️"    // شمشیر
 #define damage_ICON "🔥"    // شمشیر
+#define TOTAL_DEMONS 10 // تعداد کل شیاطین
+#define TOTAL_FIRE 7
+#define TOTAL_SNAKES 5
+#define TOTAL_GIANTS 4
+#define TOTAL_UNDEAD 2
+
 // نقشه بازی (صفحه نمایش که روی آن همه چیز رسم می‌شود)
 typedef struct {
     int x, y;
     int width, height;
+    int door_x, door_y; // Door position
+    int has_demon;
+    int has_firemonster;
+    int has_snake;
+    int has_giant;
+    int has_undead;
 } Room;
 typedef struct {
     char name[ITEM_NAME_LENGTH];
     char type[ITEM_NAME_LENGTH]; // نوع آیتم مانند غذا، اسلحه، طلسم
+    int damage;
 } Item;
 typedef struct {
     int player_x, player_y; // موقعیت بازیکن
@@ -43,6 +56,23 @@ typedef struct {
     Item inventory[MAX_INVENTORY_ITEMS]; // آیتم‌های اینونتوری
     int inventory_count;
 } GameState;
+typedef struct {
+    int x, y;        // موقعیت هیولا
+    int hp;          // سلامتی هیولا
+    int active;      // آیا هیولا فعال است یا خیر
+    int room_index;  // شاخص اتاق که هیولا در آن قرار دارد
+    int move_count;
+} Monster;
+Monster demons[TOTAL_DEMONS];
+int demon_count = 0;
+Monster undeads[TOTAL_UNDEAD];
+int undead_count = 0;
+Monster giants[TOTAL_GIANTS];
+int giant_count = 0;
+Monster snakes[TOTAL_SNAKES];
+int snake_count = 0;
+Monster firemonsters[TOTAL_FIRE];
+int fire_count = 0;
 Item inventory[MAX_INVENTORY_ITEMS];
 int inventory_count = 0;
 char current_message[100] = ""; // متغیری برای ذخیره پیام فعلی
@@ -368,6 +398,137 @@ void add_gold_bag_to_room(Room *room) {
         mvaddch(gold_bag_y, gold_bag_x, '&'); // Display gold bag on screen
         attroff(COLOR_PAIR(2)); // استفاده از رنگ قرمز برای تله‌ها
 
+    }
+}
+void add_demons_to_rooms(Room *rooms, int room_count) {
+    for (int i = 0; i < TOTAL_DEMONS; i++) {
+        int room_index, attempts = 0;
+        do {
+            room_index = rand() % room_count;
+            attempts++;
+        } while (rooms[room_index].has_demon && attempts < 100);
+
+        if (attempts >= 100) continue;
+
+        Monster demon;
+        do {
+            demon.x = rooms[room_index].x + 1 + rand() % (rooms[room_index].width - 2);
+            demon.y = rooms[room_index].y + 1 + rand() % (rooms[room_index].height - 2);
+        } while (map[demon.y][demon.x] != '.');
+
+        demon.hp = 5;
+        demon.active = 0;
+        demon.room_index = room_index;
+
+        demons[demon_count++] = demon;
+        map[demon.y][demon.x] = 'D';
+        rooms[room_index].has_demon = 1;
+    }
+}
+
+void add_undeads_to_rooms(Room *rooms, int room_count) {
+    for (int i = 0; i < TOTAL_UNDEAD; i++) {
+        int room_index, attempts = 0;
+        do {
+            room_index = rand() % room_count;
+            attempts++;
+        } while (rooms[room_index].has_undead && attempts < 100);
+
+        if (attempts >= 100) continue;
+
+        Monster undead;
+        do {
+            undead.x = rooms[room_index].x + 1 + rand() % (rooms[room_index].width - 2);
+            undead.y = rooms[room_index].y + 1 + rand() % (rooms[room_index].height - 2);
+        } while (map[undead.y][undead.x] != '.');
+
+        undead.hp = 30;
+        undead.active = 0;
+        undead.room_index = room_index;
+        undead.move_count = 0;
+
+        undeads[undead_count++] = undead;
+        map[undead.y][undead.x] = 'U';
+        rooms[room_index].has_undead = 1;
+    }
+}
+
+void add_giants_to_rooms(Room *rooms, int room_count) {
+    for (int i = 0; i < TOTAL_GIANTS; i++) {
+        int room_index, attempts = 0;
+        do {
+            room_index = rand() % room_count;
+            attempts++;
+        } while (rooms[room_index].has_giant && attempts < 100);
+
+        if (attempts >= 100) continue;
+
+        Monster giant;
+        do {
+            giant.x = rooms[room_index].x + 1 + rand() % (rooms[room_index].width - 2);
+            giant.y = rooms[room_index].y + 1 + rand() % (rooms[room_index].height - 2);
+        } while (map[giant.y][giant.x] != '.');
+
+        giant.hp = 30;
+        giant.active = 0;
+        giant.room_index = room_index;
+        giant.move_count = 0;
+
+        giants[giant_count++] = giant;
+        map[giant.y][giant.x] = 'G';
+        rooms[room_index].has_giant = 1;
+    }
+}
+
+void add_snakes_to_rooms(Room *rooms, int room_count) {
+    for (int i = 0; i < TOTAL_SNAKES; i++) {
+        int room_index, attempts = 0;
+        do {
+            room_index = rand() % room_count;
+            attempts++;
+        } while (rooms[room_index].has_snake && attempts < 100);
+
+        if (attempts >= 100) continue;
+
+        Monster snake;
+        do {
+            snake.x = rooms[room_index].x + 1 + rand() % (rooms[room_index].width - 2);
+            snake.y = rooms[room_index].y + 1 + rand() % (rooms[room_index].height - 2);
+        } while (map[snake.y][snake.x] != '.');
+
+        snake.hp = 20;
+        snake.active = 0;
+        snake.room_index = room_index;
+
+        snakes[snake_count++] = snake;
+        map[snake.y][snake.x] = 'S';
+        rooms[room_index].has_snake = 1;
+    }
+}
+
+void add_firemonster_to_rooms(Room *rooms, int room_count) {
+    for (int i = 0; i < TOTAL_FIRE; i++) {
+        int room_index, attempts = 0;
+        do {
+            room_index = rand() % room_count;
+            attempts++;
+        } while (rooms[room_index].has_firemonster && attempts < 100);
+
+        if (attempts >= 100) continue;
+
+        Monster firemonster;
+        do {
+            firemonster.x = rooms[room_index].x + 1 + rand() % (rooms[room_index].width - 2);
+            firemonster.y = rooms[room_index].y + 1 + rand() % (rooms[room_index].height - 2);
+        } while (map[firemonster.y][firemonster.x] != '.');
+
+        firemonster.hp = 10;
+        firemonster.active = 0;
+        firemonster.room_index = room_index;
+
+        firemonsters[fire_count++] = firemonster;
+        map[firemonster.y][firemonster.x] = 'F';
+        rooms[room_index].has_firemonster = 1;
     }
 }
 void add_food_to_room(Room *room) {
@@ -785,6 +946,96 @@ void load_save_list() {
     }
     refresh();
 }
+void move_demon(Monster *demon) {
+    if (!demon->active) return; // اگر غیرفعال است حرکت نکند
+
+    int dx = (rand() % 3) - 1; // حرکت تصادفی در جهت x (-1, 0, 1)
+    int dy = (rand() % 3) - 1; // حرکت تصادفی در جهت y (-1, 0, 1)
+
+    int new_x = demon->x + dx;
+    int new_y = demon->y + dy;
+
+    // بررسی اینکه حرکت به یک مکان معتبر باشد
+    chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+    if (next_cell == '.' || next_cell == '#' || next_cell == '+') {
+        mvaddch(demon->y, demon->x, '.'); // جای قبلی را پاک کن
+        demon->x = new_x;
+        demon->y = new_y;
+        mvaddch(demon->y, demon->x, 'D'); // جای جدید را نمایش بده
+    }
+}
+
+void move_undead(Monster *undead) {
+    if (!undead->active) return;
+
+    int dx = (rand() % 3) - 1;
+    int dy = (rand() % 3) - 1;
+
+    int new_x = undead->x + dx;
+    int new_y = undead->y + dy;
+
+    chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+    if (next_cell == '.' || next_cell == '#' || next_cell == '+') {
+        mvaddch(undead->y, undead->x, '.');
+        undead->x = new_x;
+        undead->y = new_y;
+        mvaddch(undead->y, undead->x, 'U');
+    }
+}
+
+void move_giant(Monster *giant) {
+    if (!giant->active) return;
+
+    int dx = (rand() % 3) - 1;
+    int dy = (rand() % 3) - 1;
+
+    int new_x = giant->x + dx;
+    int new_y = giant->y + dy;
+
+    chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+    if (next_cell == '.' || next_cell == '#' || next_cell == '+') {
+        mvaddch(giant->y, giant->x, '.');
+        giant->x = new_x;
+        giant->y = new_y;
+        mvaddch(giant->y, giant->x, 'G');
+    }
+}
+
+void move_snake(Monster *snake) {
+    if (!snake->active) return;
+
+    int dx = (rand() % 3) - 1;
+    int dy = (rand() % 3) - 1;
+
+    int new_x = snake->x + dx;
+    int new_y = snake->y + dy;
+
+    chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+    if (next_cell == '.' || next_cell == '#' || next_cell == '+') {
+        mvaddch(snake->y, snake->x, '.');
+        snake->x = new_x;
+        snake->y = new_y;
+        mvaddch(snake->y, snake->x, 'S');
+    }
+}
+
+void move_firemonster(Monster *firemonster) {
+    if (!firemonster->active) return;
+
+    int dx = (rand() % 3) - 1;
+    int dy = (rand() % 3) - 1;
+
+    int new_x = firemonster->x + dx;
+    int new_y = firemonster->y + dy;
+
+    chtype next_cell = mvinch(new_y, new_x) & A_CHARTEXT;
+    if (next_cell == '.' || next_cell == '#' || next_cell == '+') {
+        mvaddch(firemonster->y, firemonster->x, '.');
+        firemonster->x = new_x;
+        firemonster->y = new_y;
+        mvaddch(firemonster->y, firemonster->x, 'F');
+    }
+}
 // تغییر در تابع move_character
 void move_character(int *x, int *y, char *prev_cell, GameState *game_state) {
     int ch = getch();
@@ -972,6 +1223,9 @@ void start_game() {
 
     srand(time(NULL));
     initscr();
+    clear(); // اضافه کردن clear() برای پاک‌سازی منوی قبل از بازی
+    refresh(); // اعمال تغییرات در ncurses
+
     noecho();
     cbreak();
     keypad(stdscr, TRUE);
@@ -1007,7 +1261,13 @@ void start_game() {
         add_health_to_room(&rooms[i]);
         add_speed_to_room(&rooms[i]);
         add_food_to_room(&rooms[i]);
+
     }
+    add_demons_to_rooms(rooms, MAX_ROOMS);
+    add_undeads_to_rooms(rooms, MAX_ROOMS);
+    add_giants_to_rooms(rooms, MAX_ROOMS);
+    add_snakes_to_rooms(rooms, MAX_ROOMS);
+    add_firemonster_to_rooms(rooms, MAX_ROOMS);
 
     ensure_full_connectivity(rooms, MAX_ROOMS);
     int player_x = rooms[0].x + 1;
@@ -1027,6 +1287,11 @@ void start_game() {
 
     while (1) {
         move_character(&player_x, &player_y, &prev_cell, &game_state);
+        for (int i = 0; i < demon_count; i++) move_demon(&demons[i]);
+        for (int i = 0; i < undead_count; i++) move_undead(&undeads[i]);
+        for (int i = 0; i < giant_count; i++) move_giant(&giants[i]);
+        for (int i = 0; i < snake_count; i++) move_snake(&snakes[i]);
+        for (int i = 0; i < fire_count; i++) move_firemonster(&firemonsters[i]);
         mvprintw(1, 0, "❤️ HP: %d   🍖 Hunger: %d ", player_hp, hunger);
         hunger -= 1;
         if (hunger < 0) hunger = 0;
@@ -1037,6 +1302,7 @@ void start_game() {
                 game_over_screen();
                 return;            }
         }
+
         show_gold_count();
         refresh();
     }
@@ -1192,7 +1458,177 @@ void forgot_password(FILE *file) {
 
     getch(); // منتظر فشردن کلید بماند
 }
+void show_profile() {
+    char username[50] = "Guest";  // می‌توان از فایل کاربری خواند
 
+    clear();
+    mvprintw(2, (COLS - 20) / 2, "👤 Profile");
+    mvhline(3, (COLS - 20) / 2, '=', 20);
+    mvprintw(5, (COLS - 30) / 2, "Username: %s", username);
+    mvprintw(6, (COLS - 30) / 2, "Total Games Played: 5");
+    mvprintw(7, (COLS - 30) / 2, "Highest Score: 1200");
+    mvprintw(8, (COLS - 30) / 2, "Gold Collected: 350");
+
+    mvprintw(10, (COLS - 30) / 2, "Press any key to return...");
+    refresh();
+    getch();
+    return;
+}
+void show_settings() {
+    const char *options[] = {"🎭 Change Character Color", "🎮 Change Difficulty", "🔙 Back"};
+    int choice = 0, key;
+
+    while (1) {
+        clear();
+        mvprintw(2, (COLS - 20) / 2, "⚙️ Settings");
+        mvhline(3, (COLS - 20) / 2, '=', 20);
+
+        for (int i = 0; i < 3; i++) {
+            if (i == choice) {
+                attron(A_REVERSE);
+                mvprintw(5 + i, (COLS - 15) / 2, "> %s", options[i]);
+                attroff(A_REVERSE);
+            } else {
+                mvprintw(5 + i, (COLS - 15) / 2, "  %s", options[i]);
+            }
+        }
+
+        refresh();
+        key = getch();
+        if (key == KEY_UP && choice > 0) choice--;
+        else if (key == KEY_DOWN && choice < 2) choice++;
+        else if (key == '\n') {
+            if (choice == 0) { /* تغییر رنگ کاراکتر */ }
+            else if (choice == 1) { /* تغییر درجه سختی */ }
+            else break;
+        }
+    }
+}
+void show_leaderboard() {
+    FILE *file = fopen("leaderboard.txt", "r");
+    if (!file) {
+        mvprintw(LINES / 2, (COLS - 30) / 2, "⚠️ No leaderboard data found!");
+        getch();
+        return;
+    }
+
+    char line[100];
+    int row = 5;
+
+    clear();
+    mvprintw(2, (COLS - 20) / 2, "🏆 Leaderboard");
+    mvhline(3, (COLS - 20) / 2, '=', 20);
+    mvprintw(4, (COLS - 30) / 2, "Rank | Username | Score | Gold | Games Played");
+
+    while (fgets(line, sizeof(line), file)) {
+        mvprintw(row++, (COLS - 30) / 2, "%s", line);
+    }
+    fclose(file);
+    getch();
+
+}
+void show_saved_games() {
+    FILE *file = fopen("save_list.txt", "r");
+    if (!file) {
+        mvprintw(LINES / 2, (COLS - 30) / 2, "⚠️ No saved games found!");
+        getch();
+        return;
+    }
+
+    char saved_games[10][50];
+    int count = 0;
+
+    while (fgets(saved_games[count], sizeof(saved_games[count]), file) && count < 10) {
+        saved_games[count][strcspn(saved_games[count], "\n")] = 0; // حذف خط جدید
+        count++;
+    }
+    fclose(file);
+
+    if (count == 0) {
+        mvprintw(LINES / 2, (COLS - 30) / 2, "⚠️ No saved games found!");
+        getch();
+        return;
+    }
+
+    int selection = 0, key;
+    while (1) {
+        clear();
+        mvprintw(2, (COLS - 20) / 2, "💾 Saved Games");
+        mvhline(3, (COLS - 20) / 2, '=', 20);
+
+        for (int i = 0; i < count; i++) {
+            if (i == selection) {
+                attron(A_REVERSE);
+                mvprintw(5 + i, (COLS - 15) / 2, "> %s", saved_games[i]);
+                attroff(A_REVERSE);
+            } else {
+                mvprintw(5 + i, (COLS - 15) / 2, "  %s", saved_games[i]);
+            }
+        }
+
+        refresh();
+        key = getch();
+        if (key == KEY_UP && selection > 0) selection--;
+        else if (key == KEY_DOWN && selection < count - 1) selection++;
+        else if (key == '\n') {
+            GameState game_state;
+            if (load_game(saved_games[selection], &game_state)) {
+                start_game();
+            }
+            break;
+        }
+    }
+}
+void show_pre_game_menu() {
+    const char *choices[] = {
+            "🎮 New Game",
+            "💾 Continue",
+            "🏆 Leaderboard",
+            "⚙️ Settings",
+            "👤 Profile",
+            "🚪 Exit"
+    };
+
+    int choice_count = sizeof(choices) / sizeof(choices[0]);
+    int selection = 0;
+    int key;
+
+    clear();
+    while (1) {
+        clear();
+        mvprintw(2, (COLS - 20) / 2, "🎲 PRE-GAME MENU 🎲");
+        mvhline(3, (COLS - 20) / 2, '=', 20);
+
+        for (int i = 0; i < choice_count; i++) {
+            if (i == selection) {
+                attron(A_REVERSE);
+                mvprintw(5 + i, (COLS - 15) / 2, "> %s", choices[i]);
+                attroff(A_REVERSE);
+            } else {
+                mvprintw(5 + i, (COLS - 15) / 2, "  %s", choices[i]);
+            }
+        }
+
+        refresh();
+        key = getch();
+        if (key == KEY_UP && selection > 0) selection--;
+        else if (key == KEY_DOWN && selection < choice_count - 1) selection++;
+        else if (key == '\n') break;
+    }
+
+    // اجرای عملکرد متناسب با گزینه انتخاب‌شده
+    switch (selection) {
+        case 0:  // New Game
+            start_game();
+            return;
+        case 1: show_saved_games(); break;
+        case 2: show_leaderboard(); break;
+        case 3: show_settings(); break;
+        case 4: show_profile(); break;
+        case 5: endwin(); exit(0);
+    }
+    show_pre_game_menu();
+}
 void login(FILE *file) {
     char username[100], password[100];
 
@@ -1203,7 +1639,7 @@ void login(FILE *file) {
         mvprintw(LINES / 2, (COLS - 20) / 2, "Login successful!");
         getch();
         clear();
-        start_game();  // اجرای بازی بعد از لاگین موفق
+        show_pre_game_menu();  // اجرای بازی بعد از لاگین موفق
     } else {
         mvprintw(LINES / 2, (COLS - 30) / 2, "Error: Invalid username or password.");
         getch();
@@ -1215,7 +1651,7 @@ void login_guest() {
     mvprintw(LINES / 2, (COLS - 20) / 2, "Logged in as guest.");
     getch();
     clear();
-    start_game();  // اجرای بازی برای مهمان
+    show_pre_game_menu();  // اجرای بازی برای مهمان
 }
 
 void show_menu(const char *choices[], int n_choices, FILE *file) {
@@ -1300,23 +1736,23 @@ void show_ascii_art() {
     bkgd(COLOR_PAIR(1)); // تنظیم پس‌زمینه مشکی
 
     int start_y = (LINES - 8) / 2;
-    int x_offset = (COLS - 90) / 2;
+    int x_offset = (COLS - 65) / 2;
 
     attron(COLOR_PAIR(1));
-    mvprintw(start_y, x_offset, "░▒▓████████▓▒░▒▓██████▓▒░░▒▓███████▓▒░       ░▒▓███████▓▒░░▒▓████████▓▒░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░ ");
-    mvprintw(start_y + 1, x_offset, "░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░             ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ");
-    mvprintw(start_y + 2, x_offset, "░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░             ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ");
-    mvprintw(start_y + 3, x_offset, "░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓███████▓▒░        ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░░▒▓████████▓▒░ ");
-    mvprintw(start_y + 4, x_offset, "░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░ ");
-    mvprintw(start_y + 5, x_offset, "░▒▓█▓▒░     ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░             ░▒▓█▓▒░ ");
-    mvprintw(start_y + 6, x_offset, "░▒▓█▓▒░      ░▒▓██████▓▒░░▒▓█▓▒░             ░▒▓████████▓▒░▒▓████████▓▒░▒▓████████▓▒░      ░▒▓█▓▒░ ");
+    mvprintw(start_y, x_offset, "░▒▓███████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓████████▓▒░ ");
+    mvprintw(start_y + 1, x_offset, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        ");
+    mvprintw(start_y + 2, x_offset, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        ");
+    mvprintw(start_y + 3, x_offset, "░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒▒▓███▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓██████▓▒░   ");
+    mvprintw(start_y + 4, x_offset, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        ");
+    mvprintw(start_y + 5, x_offset, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        ");
+    mvprintw(start_y + 6, x_offset, "░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓████████▓▒░ ");
 
     // خط جداکننده
     mvhline(start_y + 7, (COLS - 50) / 2, '-', 50);
 
     // متن چشمک‌زن
     attron(A_BOLD | A_BLINK);
-    mvprintw(start_y + 10, (COLS - 20) / 2, "🔥 WELCOME TO FOP 2024 🔥");
+    mvprintw(start_y + 10, (COLS - 20) / 2, "🔥 WELCOME TO FOP 2024 PROJECT 🔥");
     attroff(A_BOLD | A_BLINK);
 
     // پیام تایپ شونده
@@ -1333,6 +1769,7 @@ void show_ascii_art() {
 
     while (getch() != '\n');  // انتظار برای Enter
 }
+
 int main() {
     setlocale(LC_ALL, "");
     FILE *file = fopen("usersfile", "a+b");
@@ -1351,6 +1788,7 @@ int main() {
         show_loading_animation();
         const char *choices[] = {"Register", "Login", "Forgot Password", "Login as Guest", "Exit"};
         show_menu(choices, 5, file);
+
     }
 
     fclose(file);
