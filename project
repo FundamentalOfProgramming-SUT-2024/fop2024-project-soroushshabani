@@ -17,22 +17,21 @@
 #define MAX_COLS 100
 #define MAX_INVENTORY_ITEMS 100
 #define ITEM_NAME_LENGTH 50
-#define MACE_ICON "🪢"    // شلاق
-#define DAGGER_ICON "📌"  // خنجر
-#define WAND_ICON "🪄"    // چوب جادو
-#define ARROW_ICON "🏹"   // تیر و کمان
-#define SWORD_ICON "🗡"    // شمشیر
-#define speed_ICON "🏃‍♂️"    // شمشیر
-#define health_ICON "❤️"    // شمشیر
-#define damage_ICON "🔥"    // شمشیر
-#define TOTAL_DEMONS 10 // تعداد کل شیاطین
+#define MACE_ICON "🪢"
+#define DAGGER_ICON "📌"
+#define WAND_ICON "🪄"
+#define ARROW_ICON "🏹"
+#define SWORD_ICON "🗡"
+#define speed_ICON "🏃‍♂️"
+#define health_ICON "❤️"
+#define damage_ICON "🔥"
+#define TOTAL_DEMONS 10
 #define TOTAL_FIRE 7
 #define TOTAL_SNAKES 5
 #define TOTAL_GIANTS 4
 #define TOTAL_UNDEAD 2
 
 
-// نقشه بازی (صفحه نمایش که روی آن همه چیز رسم می‌شود)
 typedef struct {
     int x, y;
     int width, height;
@@ -44,13 +43,13 @@ typedef struct {
     int has_undead;
 } Room;
 typedef struct {
-    char name[20];  // نام طلسم
-    int duration;   // مدت زمان باقی‌مانده
-    int active;     // آیا طلسم فعال است یا نه
+    char name[20];
+    int duration;
+    int active;
 } Spell;
 typedef struct {
     char name[ITEM_NAME_LENGTH];
-    char type[ITEM_NAME_LENGTH]; // نوع آیتم مانند غذا، اسلحه، طلسم
+    char type[ITEM_NAME_LENGTH];
     int damage;
 } Item;
 typedef struct {
@@ -95,6 +94,7 @@ int hunger = 60;
 Spell active_spells[3];  // سه طلسم می‌توانند همزمان فعال باشند
 int food_count = 0;   // تعداد غذاهای همراه بازیکن
 char *background_music = "/Users/soroushshabani/Downloads/Hans Zimmer - cornfield chase (320).mp3";// بررسی تداخل اتاق‌ها
+char current_username[100] = "Guest";  // مقدار پیش‌فرض
 // ===================== 🔥 FUNCTION LIST 🔥 ===================== //
 // ➤ Utility Functions
 void initialize_trap_map();          // 🎯 مقداردهی اولیه نقشه تله‌ها
@@ -613,6 +613,7 @@ void add_food_to_room(Room *room) {
         attroff(COLOR_PAIR(6));
     }
 }
+
 //void show_status() {
 //    mvprintw(1, 0, "❤️ Health: %d  🍽 Hunger: %d  🍎 Food: %d", player_hp, hunger, food_count);
 //    refresh();
@@ -1560,6 +1561,22 @@ void start_game() {
         }
 
         show_gold_count();
+        int remaining_items = 0;
+        for (int y = 0; y < LINES; y++) {
+            for (int x = 0; x < COLS; x++) {
+                if (  map[y][x] == '&' || map[y][x] == 'B') {
+                    remaining_items++;
+                }
+            }
+        }
+
+        if (remaining_items == 0) {
+            mvprintw(LINES / 2, (COLS - 20) / 2, "🏆 YOU WON THE GAME! 🏆");
+            refresh();
+            sleep(3);
+            endwin();
+            return;
+        }
         refresh();
     }
 
@@ -1686,6 +1703,7 @@ void signin(FILE *file) {
     }
 
     fwrite(&new_user, sizeof(User), 1, file);
+    strcpy(current_username, new_user.username);  // ذخیره نام کاربری ثبت‌شده
     mvprintw(LINES / 2, (COLS - 30) / 2, "User registered successfully.");
     getch();
 }
@@ -1715,12 +1733,10 @@ void forgot_password(FILE *file) {
     getch(); // منتظر فشردن کلید بماند
 }
 void show_profile() {
-    char username[50] = "Guest";  // می‌توان از فایل کاربری خواند
-
     clear();
     mvprintw(2, (COLS - 20) / 2, "👤 Profile");
     mvhline(3, (COLS - 20) / 2, '=', 20);
-    mvprintw(5, (COLS - 30) / 2, "Username: %s", username);
+    mvprintw(5, (COLS - 30) / 2, "Username: %s", current_username);
     mvprintw(6, (COLS - 30) / 2, "Total Games Played: 5");
     mvprintw(7, (COLS - 30) / 2, "Highest Score: 1200");
     mvprintw(8, (COLS - 30) / 2, "Gold Collected: 350");
@@ -1729,6 +1745,48 @@ void show_profile() {
     refresh();
     getch();
     return;
+}
+void show_difficulty_menu() {
+    const char *difficulties[] = {"😊 Easy (HP: 40)", "🔥 Hard (HP: 30)", "🔙 Back"};
+    int choice = 0, key;
+
+    while (1) {
+        clear();
+        mvprintw(2, (COLS - 25) / 2, "🎮 Select Difficulty");
+        mvhline(3, (COLS - 25) / 2, '=', 25);
+
+        for (int i = 0; i < 3; i++) {
+            if (i == choice) {
+                attron(A_REVERSE);
+                mvprintw(5 + i, (COLS - 20) / 2, "> %s", difficulties[i]);
+                attroff(A_REVERSE);
+            } else {
+                mvprintw(5 + i, (COLS - 20) / 2, "  %s", difficulties[i]);
+            }
+        }
+
+        refresh();
+        key = getch();
+        if (key == KEY_UP && choice > 0) choice--;
+        else if (key == KEY_DOWN && choice < 2) choice++;
+        else if (key == '\n') {
+            if (choice == 0) {
+                player_hp = 40;
+                mvprintw(10, (COLS - 20) / 2, "😊 Easy mode selected!");
+                refresh();
+                sleep(1);
+                break;
+            }
+            else if (choice == 1) {
+                player_hp = 30;
+                mvprintw(10, (COLS - 20) / 2, "🔥 Hard mode selected!");
+                refresh();
+                sleep(1);
+                break;
+            }
+            else break;
+        }
+    }
 }
 void show_settings() {
     const char *options[] = {"🎭 Change Character Color", "🎮 Change Difficulty", "🔙 Back"};
@@ -1754,12 +1812,18 @@ void show_settings() {
         if (key == KEY_UP && choice > 0) choice--;
         else if (key == KEY_DOWN && choice < 2) choice++;
         else if (key == '\n') {
-            if (choice == 0) { /* تغییر رنگ کاراکتر */ }
-            else if (choice == 1) { /* تغییر درجه سختی */ }
+            if (choice == 0) {
+                // تغییر رنگ کاراکتر (در صورت نیاز بعداً اضافه شود)
+            }
+            else if (choice == 1) {
+                show_difficulty_menu();  // نمایش منوی سختی بازی
+            }
             else break;
         }
     }
 }
+
+
 void show_leaderboard() {
     FILE *file = fopen("leaderboard.txt", "r");
     if (!file) {
@@ -1852,16 +1916,19 @@ void show_pre_game_menu() {
     clear();
     while (1) {
         clear();
-        mvprintw(2, (COLS - 20) / 2, "🎲 PRE-GAME MENU 🎲");
-        mvhline(3, (COLS - 20) / 2, '=', 20);
+        mvprintw(2, (COLS - 30) / 2, "🎲 PRE-GAME MENU 🎲");
+        mvhline(3, (COLS - 30) / 2, '=', 30);
+
+        // نمایش نام کاربری
+        mvprintw(4, (COLS - 30) / 2, "👤 Logged in as: %s", current_username);
 
         for (int i = 0; i < choice_count; i++) {
             if (i == selection) {
                 attron(A_REVERSE);
-                mvprintw(5 + i, (COLS - 15) / 2, "> %s", choices[i]);
+                mvprintw(6 + i, (COLS - 15) / 2, "> %s", choices[i]);
                 attroff(A_REVERSE);
             } else {
-                mvprintw(5 + i, (COLS - 15) / 2, "  %s", choices[i]);
+                mvprintw(6 + i, (COLS - 15) / 2, "  %s", choices[i]);
             }
         }
 
@@ -1872,16 +1939,13 @@ void show_pre_game_menu() {
         else if (key == '\n') break;
     }
 
-    // اجرای عملکرد متناسب با گزینه انتخاب‌شده
     switch (selection) {
-        case 0:  // New Game
-            start_game();
-            return;
-        case 1: show_saved_games(); break;
-        case 2: show_leaderboard(); break;
-        case 3: show_settings(); break;
-        case 4: show_profile(); break;
-        case 5: endwin(); exit(0);
+        case 0:  start_game(); return;
+        case 1:  show_saved_games(); break;
+        case 2:  show_leaderboard(); break;
+        case 3:  show_settings(); break;
+        case 4:  show_profile(); break;
+        case 5:  endwin(); exit(0);
     }
     show_pre_game_menu();
 }
@@ -1892,6 +1956,7 @@ void login(FILE *file) {
     get_input("Enter password: ", password, 100);
 
     if (authenticate_user(file, username, password)) {
+        strcpy(current_username, username);  // ذخیره نام کاربری لاگین شده
         mvprintw(LINES / 2, (COLS - 20) / 2, "Login successful!");
         getch();
         clear();
@@ -1903,11 +1968,12 @@ void login(FILE *file) {
 }
 
 void login_guest() {
+    strcpy(current_username, "Guest");
     clear();
     mvprintw(LINES / 2, (COLS - 20) / 2, "Logged in as guest.");
     getch();
     clear();
-    show_pre_game_menu();  // اجرای بازی برای مهمان
+    show_pre_game_menu();
 }
 
 void show_menu(const char *choices[], int n_choices, FILE *file) {
@@ -1989,9 +2055,9 @@ void show_ascii_art() {
     clear();
     start_color();
     init_pair(1, COLOR_WHITE, COLOR_BLACK);
-    bkgd(COLOR_PAIR(1)); // تنظیم پس‌زمینه مشکی
+    bkgd(COLOR_PAIR(1));
 
-    int start_y = (LINES - 8) / 2;
+    int start_y = (LINES - 10) / 2;
     int x_offset = (COLS - 65) / 2;
 
     attron(COLOR_PAIR(1));
@@ -2003,27 +2069,26 @@ void show_ascii_art() {
     mvprintw(start_y + 5, x_offset, "░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░        ");
     mvprintw(start_y + 6, x_offset, "░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░ ░▒▓██████▓▒░ ░▒▓██████▓▒░░▒▓████████▓▒░ ");
 
-    // خط جداکننده
     mvhline(start_y + 7, (COLS - 50) / 2, '-', 50);
 
-    // متن چشمک‌زن
     attron(A_BOLD | A_BLINK);
     mvprintw(start_y + 10, (COLS - 20) / 2, "🔥 WELCOME TO FOP 2024 PROJECT 🔥");
     attroff(A_BOLD | A_BLINK);
 
-    // پیام تایپ شونده
     type_text("Press ENTER to continue...", start_y + 12, (COLS - 20) / 2);
 
-    // جمله انگیزشی
     mvprintw(start_y + 14, (COLS - 40) / 2, "\"The journey of a thousand miles begins with one step.\"");
+
+    attron(A_BOLD);
+    mvprintw(start_y + 16, (COLS - 25) / 2, "Created by Amin Shabani");
+    attroff(A_BOLD);
 
     attroff(COLOR_PAIR(1));
     refresh();
 
-    // انیمیشن بارگذاری
     show_loading_animation();
 
-    while (getch() != '\n');  // انتظار برای Enter
+    while (getch() != '\n');
 }
 void save_score_to_leaderboard(const char *username, int gold) {
     FILE *file = fopen("leaderboard.txt", "a");
